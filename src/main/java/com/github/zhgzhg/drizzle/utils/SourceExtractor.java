@@ -1,4 +1,4 @@
-package com.github.zhgzhg.drizzle;
+package com.github.zhgzhg.drizzle.utils;
 
 import com.github.zhgzhg.drizzle.parser.CPP14Lexer;
 import com.github.zhgzhg.drizzle.parser.CPP14Parser;
@@ -51,7 +51,7 @@ public class SourceExtractor {
 
     public static final Pattern DEPENDS_ON_LIB_VERSION =
             Pattern.compile("^[^@]*" + DEPENDSON_MARKER + "\\s+(?<" + LIB_GROUP + ">[^:]+)::(?<" + VER_GROUP + ">.+)$");
-
+    private LogProxy logProxy;
 
     public static class BoardManager {
         public final String platform;
@@ -85,22 +85,27 @@ public class SourceExtractor {
         }
     }
 
-    private Editor editor;
-
-    public SourceExtractor(Editor editor) {
-        this.editor = editor;
+    public SourceExtractor(LogProxy logProxy) {
+        this.logProxy = logProxy;
     }
 
-    public Board dependentBoardFromMainSketchSource() {
-        SketchFile primaryFile = editor.getSketch().getPrimaryFile();
-        if (primaryFile == null) {
-            editor.statusError(ERR_DETERMINING_PRIMARY_SKETCH_FILE);
-            return null;
+    public static String loadSourceFromPrimarSketch(Editor editor) throws IOException {
+        if (editor != null) {
+            SketchFile primaryFile = editor.getSketch().getPrimaryFile();
+            if (primaryFile != null) {
+                return primaryFile.load();
+            } else {
+                editor.statusError(ERR_DETERMINING_PRIMARY_SKETCH_FILE);
+            }
         }
+        return null;
+    }
+
+    public Board dependentBoardFromMainSketchSource(String source) {
 
         try {
             Map<String, String> boardPlatformAndName = extractMarkersKeyValue(
-                    extractAllCommentsFromSource(primaryFile.load()), BOARD, BOARDNAME_MARKER, PLATFORM_GROUP, BOARD_GROUP);
+                    extractAllCommentsFromSource(source), BOARD, BOARDNAME_MARKER, PLATFORM_GROUP, BOARD_GROUP);
 
             Board result = null;
             for (Iterator<Map.Entry<String, String>> it = boardPlatformAndName.entrySet().iterator(); it.hasNext(); ) {
@@ -109,7 +114,8 @@ public class SourceExtractor {
                 if (result == null && boardCandidate.getValue() != null && !boardCandidate.getValue().isEmpty()) {
                     result = new Board(boardCandidate.getKey(), boardCandidate.getValue());
                 } else {
-                    System.err.printf("Ignoring additional %s %s::%s%n", BOARDNAME_MARKER, boardCandidate.getKey(), boardCandidate.getValue());
+                    this.logProxy.cliError("Ignoring additional %s %s::%s%n", BOARDNAME_MARKER, boardCandidate.getKey(),
+                            boardCandidate.getValue());
                 }
             }
 
@@ -121,15 +127,10 @@ public class SourceExtractor {
         return null;
     }
 
-    public BoardManager dependentBoardManagerFromMainSketchSource() {
-        SketchFile primaryFile = editor.getSketch().getPrimaryFile();
-        if (primaryFile == null) {
-            editor.statusError(ERR_DETERMINING_PRIMARY_SKETCH_FILE);
-            return null;
-        }
+    public BoardManager dependentBoardManagerFromMainSketchSource(String source) {
 
         try {
-            Map<String, Map<String, String>> platformBoardUrl = extractMarkersKeyAndParams(extractAllCommentsFromSource(primaryFile.load()),
+            Map<String, Map<String, String>> platformBoardUrl = extractMarkersKeyAndParams(extractAllCommentsFromSource(source),
                     BOARD_MANAGER, BOARDMANAGER_MARKER, PLATFORM_GROUP, Arrays.asList(VER_GROUP, URL_GROUP));
 
             if (platformBoardUrl.isEmpty()) return null;
@@ -148,14 +149,14 @@ public class SourceExtractor {
                         try {
                             new URL(url);
                         } catch (MalformedURLException e) {
-                            System.err.printf("Invalid URL in comment %s %s::%s::%s - %s%n",
-                                    BOARDMANAGER_MARKER, result.getKey(), ver, url, e.getMessage());
+                            this.logProxy.cliError("Invalid URL in comment %s %s::%s::%s - %s%n", BOARDMANAGER_MARKER,
+                                    result.getKey(), ver, url, e.getMessage());
                             result = null;
                         }
                     }
                 } else {
                     Map.Entry<String, Map<String, String>> skipped = it.next();
-                    System.err.printf("Ignoring additional comment %s %s::%s::%s%n", BOARDMANAGER_MARKER, skipped.getKey(),
+                    this.logProxy.cliError("Ignoring additional comment %s %s::%s::%s%n", BOARDMANAGER_MARKER, skipped.getKey(),
                             skipped.getValue().get(VER_GROUP), skipped.getValue().get(URL_GROUP));
                 }
             }
@@ -170,16 +171,10 @@ public class SourceExtractor {
         return null;
     }
 
-    public Map<String, String> dependentLibsFromMainSketchSource() {
-        SketchFile primaryFile = editor.getSketch().getPrimaryFile();
-        if (primaryFile == null) {
-            editor.statusError(ERR_DETERMINING_PRIMARY_SKETCH_FILE);
-            return Collections.emptyMap();
-        }
-
+    public Map<String, String> dependentLibsFromMainSketchSource(String source) {
         try {
             return extractMarkersKeyValue(
-                    extractAllCommentsFromSource(primaryFile.load()), DEPENDS_ON_LIB_VERSION, DEPENDSON_MARKER, LIB_GROUP, VER_GROUP);
+                    extractAllCommentsFromSource(source), DEPENDS_ON_LIB_VERSION, DEPENDSON_MARKER, LIB_GROUP, VER_GROUP);
         } catch (IOException e) {
             e.printStackTrace(System.err);
         }
@@ -205,7 +200,7 @@ public class SourceExtractor {
                                 }
                                 result.put(key, params);
                             } else if (comment.matches("^[^@]*" + markerName + "(?:\\s|$)")) {
-                                editor.statusNotice("Ignoring duplicated or invalid marker comment:\n" + comment);
+                                this.logProxy.uiInfo("Ignoring duplicated or invalid marker comment:\n" + comment);
                             }
                         },
                         LinkedHashMap::putAll
