@@ -33,6 +33,7 @@ jobs:
           mkdir -p ./Drizzle/tool
           mv ./target/*.jar ./Drizzle/tool
           cp README.md ./Drizzle
+          cp LICENSE ./Drizzle
           zip -9r drizzle.zip ./Drizzle
           rm -fr ./Drizzle
 
