@@ -81,6 +81,5 @@ Supported Markers
 How To Compile
 --------------
 
-1. Install Maven 3.6+
-2. `mvn com.googlecode.maven-download-plugin:download-maven-plugin:wget@install-arduino-libs`
-3. `mvn clean package`
+1. `mvnw com.googlecode.maven-download-plugin:download-maven-plugin:wget@install-arduino-libs`
+2. `mvnw clean package`
