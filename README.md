@@ -6,7 +6,6 @@ By clicking on "Tools / Bulk Resolve Marked Dependencies" it will download the l
 sketch file.
 
 ![Build Fat Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Fat%20Jar/badge.svg)
-![Release Final Product](https://github.com/zhgzhg/Drizzle/workflows/Release%20Final%20Product/badge.svg?event=release)
 
 How to Use
 ----------
