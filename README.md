@@ -1,6 +1,6 @@
 Drizzle
 =======
-A Lightweight dependency helper for Arduino IDE.
+A lightweight dependency helper for Arduino IDE.
 
 By clicking on "Tools / Bulk Resolve Marked Dependencies" it will download the libraries and platform specified into the comments of your
 sketch file.
