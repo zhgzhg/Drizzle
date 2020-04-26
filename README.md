@@ -59,7 +59,7 @@ Supported Markers
   * Examples:
     * `@BoardManager Arduino AVR Boards::1.6.4`
     * `@BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json`
-    * `@BoardManager esp32::>1.0.4::https://dl.espressif.com/dl/package_esp32_index.json`
+    * `@BoardManager esp32::>1.0.3::https://dl.espressif.com/dl/package_esp32_index.json`
 * __@Board__ _platform_name_::_board_name_
   * Selects the name of the target board
   * __Respects the first valid marker that's found. The rest will be ignored.__
