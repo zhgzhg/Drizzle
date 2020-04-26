@@ -45,7 +45,7 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: Drizzle ${{ github.ref }}
-          body: To install Drizzle ${{ steps.vars.outputs.tag }} unzip it Arduino IDE's installation directory / tools
+          body: To install Drizzle ${{ steps.vars.outputs.tag }} unzip it inside Arduino IDE's installation directory / tools
           draft: false
           prerelease: false
 
