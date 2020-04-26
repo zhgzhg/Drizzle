@@ -72,7 +72,7 @@ Supported Markers
   * __More__ than 1 marker can be used
   * The version can be either specified directly or via conditional expressions.
     * Full list of the supported expressions at: https://github.com/npm/node-semver#ranges
-  * Examples
+  * Examples:
     * `@DependsOn Arduino_CRC32::1.0.0`
     * `@DependsOn Arduino Cloud Provider Examples::*`
     * `@DependsOn BMP280_DEV::(>= 1.0.8 || < 1.0.15)`
