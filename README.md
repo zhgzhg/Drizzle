@@ -77,6 +77,31 @@ Supported Markers
     * `@DependsOn Arduino Cloud Provider Examples::*`
     * `@DependsOn BMP280_DEV::(>= 1.0.8 || < 1.0.15)`
 
+CLI Extras
+----------
+
+In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON.
+
+For e.g: `java -jar drizzle-0.3.0.jar --parse hello-world.ino` will produce:
+
+```
+{
+    "board_manager": {
+        "platform": "esp8266",
+        "version": "^2.6.3",
+        "url": "https://arduino.esp8266.com/stable/package_esp8266com_index.json"
+    },
+    "board": {
+        "platform": "esp8266",
+        "name": "NodeMCU 1.0 (ESP-12E Module)"
+    },
+    "libraries": {
+        "BMP280_DEV": "(>= 1.0.8 || < 1.0.15)",
+        "Arduino_CRC32": "1.0.0",
+        "Arduino Cloud Provider Examples": "*"
+    }
+}
+```  
 
 How To Compile
 --------------

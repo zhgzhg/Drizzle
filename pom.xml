@@ -22,7 +22,7 @@
 
     <groupId>com.github.zhgzhg</groupId>
     <artifactId>drizzle</artifactId>
-    <version>0.2.1-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -31,6 +31,7 @@
         <arduino-version>1.8.12</arduino-version>
         <antlr4-version>4.5.2-1</antlr4-version>
         <semver4j-version>0.16.4</semver4j-version>
+        <gson-version>2.8.6</gson-version>
 
         <download-maven-plugin-version>1.5.1</download-maven-plugin-version>
         <maven-assembly-plugin-version>3.2.0</maven-assembly-plugin-version>
@@ -55,6 +56,12 @@
             <groupId>org.antlr</groupId>
             <artifactId>antlr4-runtime</artifactId>
             <version>${antlr4-version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.google.code.gson</groupId>
+            <artifactId>gson</artifactId>
+            <version>${gson-version}</version>
         </dependency>
 
         <dependency>
@@ -140,9 +147,14 @@
                         <descriptorRef>jar-with-dependencies</descriptorRef>
                     </descriptorRefs>
                     <archive>
+                        <manifest>
+                            <mainClass>com.github.zhgzhg.drizzle.DrizzleCLI</mainClass>
+                        </manifest>
                         <manifestEntries>
                             <Automatic-Module-Name>com.github.zhgzhg.drizzle</Automatic-Module-Name>
+                            <Implementation-Title>Drizzle</Implementation-Title>
                             <Implementation-Version>${project.version}</Implementation-Version>
+                            <Implementation-Vendor>zhgzhg</Implementation-Vendor>
                         </manifestEntries>
                     </archive>
                 </configuration>
