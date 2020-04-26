@@ -18,16 +18,20 @@ import processing.app.debug.TargetBoard;
 import processing.app.tools.Tool;
 
 import javax.swing.*;
+import java.awt.*;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
+    public static final String BOARD_MENU_PREFIX_LABEL = "Board:";
     private Editor editor;
     private ContributionInstaller contributionInstaller;
     private LibrariesIndex librariesIndex;
@@ -35,10 +39,8 @@ public class Drizzle implements Tool {
     private SourceExtractor sourceExtractor;
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
 
-    private final ProgressListener progressListener = progress -> {
-        if (((long) progress.getProgress()) % 5 == 0) System.out.print("...");
-        if (((long) progress.getProgress()) % 8400 == 0) System.out.println();
-    };
+    private final ProgressPrinter progressPrinter = new ProgressPrinter();
+    private final ProgressListener progressListener = progress -> progressPrinter.progress();
 
     @Override
     public void init(final Editor editor) {
@@ -56,7 +58,7 @@ public class Drizzle implements Tool {
 
     @Override
     public void run() {
-        Stream.of(editor.getContentPane().getComponents())
+        Optional<EditorConsole> console = Stream.of(editor.getContentPane().getComponents())
                 .filter(c -> c instanceof JPanel)
                 .flatMap(c -> Stream.of(((JPanel) c).getComponents()))
                 .filter(c -> c instanceof Box)
@@ -67,11 +69,12 @@ public class Drizzle implements Tool {
                 .flatMap(c -> Stream.of(((JPanel) c).getComponents()))
                 .filter(c -> c instanceof EditorConsole)
                 .map(c -> (EditorConsole) c)
-                .forEach(EditorConsole::clear);
+                .findFirst();
+        console.ifPresent(EditorConsole::clear);
 
         editor.statusNotice("                                                                                                                                                                                                               ");
 
-        SwingUtilities.invokeLater(() -> {
+        new Thread(() -> {
             int installedBoardsCount = installBoards();
             if (installedBoardsCount == 0) {
                 System.out.println("No platform definitions managed by " + SourceExtractor.BOARDMANAGER_MARKER +
@@ -87,10 +90,10 @@ public class Drizzle implements Tool {
             }
 
             if (selectBoard() == 0) {
-                System.out.println(
-                        "No default board specified with " + SourceExtractor.BOARDNAME_MARKER + " marker in the main sketch was found");
+                System.out.println("No default board specified with " + SourceExtractor.BOARDNAME_MARKER +
+                        " marker in the main sketch was found");
             }
-        });
+        }).start();
     }
 
     private int selectBoard() {
@@ -117,13 +120,33 @@ public class Drizzle implements Tool {
 
         BaseNoGui.selectBoard(targetBoard);
         BaseNoGui.onBoardOrPortChange();
+        System.out.printf("Selected board %s%n", targetBoard.getName());
         try {
             Base.INSTANCE.getBoardsCustomMenus().stream()
-                    .filter(menu -> menu.getText().startsWith("Board:"))
+                    .filter(menu -> menu.getText().startsWith(BOARD_MENU_PREFIX_LABEL))
+                    .limit(1)
+                    .filter(Objects::nonNull)
+                    .forEach(b -> {
+                        Container parent = b.getParent();
+                        if (parent != null)
+                            parent.remove(b);
+                    });
+            Base.INSTANCE.rebuildBoardsMenu();
+        } catch (Exception e) {
+            e.printStackTrace(System.err);
+        }
+
+        try {
+            // Unlikely
+            Base.INSTANCE.getBoardsCustomMenus().stream()
+                    .filter(menu -> menu.getText().startsWith(BOARD_MENU_PREFIX_LABEL))
                     .flatMap(menu -> Stream.of(menu.getMenuComponents()))
                     .filter(component -> component instanceof JMenuItem && ((JMenuItem) component).getText().equals(board.name))
                     .map(component -> (JMenuItem) component)
-                    .forEach(item -> item.doClick());
+                    .forEach(item -> {
+                        System.out.printf("Re-selecting board %s%n", item.getText());
+                        item.doClick();
+                    });
         } catch (Exception e) {
             e.printStackTrace(System.err);
         }
@@ -136,13 +159,12 @@ public class Drizzle implements Tool {
         if (bmSettings == null) return -1;
 
         String boardUrlsCsv = PreferencesData.get(cc.arduino.Constants.PREF_BOARDS_MANAGER_ADDITIONAL_URLS, "");
-        //Base.INSTANCE.getEditors().stream().map(editor -> editor.updateKeywords())
-
         if (bmSettings.url != null && !boardUrlsCsv.toLowerCase().contains(bmSettings.url)) {
             PreferencesData.set(cc.arduino.Constants.PREF_BOARDS_MANAGER_ADDITIONAL_URLS, boardUrlsCsv.concat(",").concat(bmSettings.url));
         }
 
         System.out.print("Updating platform definitions list...");
+        this.progressPrinter.begin(1, -1, 100, "...");
         List<String> downloadedPackageIndexFiles = this.contributionInstaller.updateIndex(this.progressListener);
         try {
             this.contributionInstaller.deleteUnknownFiles(downloadedPackageIndexFiles);
@@ -150,10 +172,9 @@ public class Drizzle implements Tool {
             e.printStackTrace(System.err);
             return 0;
         }
-        System.out.println("\nDone!");
+        System.out.println(" done!\n");
 
-        System.out.println("Installing platform...");
-
+        System.out.println("Preparing platform installation...");
         List<ContributedPlatform> possiblePlatforms = BaseNoGui.indexer.getPackages().stream()
                 .map(ContributedPackage::getPlatforms)
                 .flatMap(List::stream)
@@ -168,7 +189,7 @@ public class Drizzle implements Tool {
         if (chosenVersion != null && !chosenVersion.isEmpty()) {
             int platfIndex = candidateVersions.indexOf(chosenVersion);
             ContributedPlatform platformToInstall = possiblePlatforms.get(platfIndex);
-            System.out.printf("Picked %s%n", platformToInstall.getParsedVersion());
+            System.out.printf("Selected platform version %s%n", platformToInstall.getParsedVersion());
 
             boolean refreshUI = false;
 
@@ -182,7 +203,9 @@ public class Drizzle implements Tool {
             }
 
             if (!platformToInstall.isInstalled()) {
-                System.out.print("Installing...");
+                System.out.print("Installing platform...");
+                int printIndex = platformToInstall.isDownloaded() ? 1 : 20;
+                this.progressPrinter.begin(1, printIndex, printIndex * 80, ".");
                 try {
                     this.contributionInstaller.install(platformToInstall, this.progressListener);
                     refreshUI = true;
@@ -194,16 +217,7 @@ public class Drizzle implements Tool {
                 }
             }
 
-            if (refreshUI) {
-                try {
-                    BaseNoGui.initPackages();
-                    Base.INSTANCE.rebuildBoardsMenu();
-                    Base.INSTANCE.getProgrammerMenus();
-                    Base.INSTANCE.onBoardOrPortChange();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
+            if (refreshUI) rebuildBoardMenuUI();
         } else {
             System.err.printf("Failed to pick version for platform %s, expression %s%n", bmSettings.platform, bmSettings.version);
         }
@@ -211,11 +225,33 @@ public class Drizzle implements Tool {
         return 1;
     }
 
+    private void rebuildBoardMenuUI() {
+        try {
+            Base.INSTANCE.getBoardsCustomMenus().stream()
+                    .filter(menu -> menu.getText().startsWith(BOARD_MENU_PREFIX_LABEL))
+                    .limit(1)
+                    .filter(Objects::nonNull)
+                    .forEach(b -> {
+                        Container parent = b.getParent();
+                        if (parent != null)
+                            parent.remove(b);
+                    });
+
+            BaseNoGui.initPackages();
+            Base.INSTANCE.rebuildBoardsMenu();
+            Base.INSTANCE.rebuildProgrammerMenu();
+            Base.INSTANCE.rebuildSketchbookMenus();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
     private List<ContributedLibrary> loadAvailableLibraries() {
         try {
             System.out.print("Updating library info...");
+            this.progressPrinter.begin(1, -1, 80, ".");
             libraryInstaller.updateIndex(progressListener);
-            System.out.println("\nDone!");
+            System.out.println(" done!");
         } catch (Exception e) {
             System.err.println("error!\n" + e.getMessage());
             BaseNoGui.showError("Error Updating Packages Info", e.getMessage(), e);
@@ -257,7 +293,7 @@ public class Drizzle implements Tool {
             if (chosenVersion != null && !chosenVersion.isEmpty()) {
                 int libIndex = installCandidateVersions.indexOf(chosenVersion);
                 ContributedLibrary l = installCandidates.get(libIndex);
-                System.out.printf("Picked %s%n", l.getParsedVersion());
+                System.out.printf("Picked library version %s%n", l.getParsedVersion());
                 librariesToInstall.add(l);
             } else {
                 System.err.printf("Failed to pick version for library %s, expression %s%n", libName, libVer);
@@ -266,15 +302,31 @@ public class Drizzle implements Tool {
 
         System.out.print("Installing libraries...");
         try {
+            this.progressPrinter.begin(1, 5, 80, ".");
             this.libraryInstaller.install(librariesToInstall, progressListener);
+
+            Stream.of(editor.getContentPane().getParent().getComponents())
+                    .filter(c -> c instanceof JMenuBar)
+                    .map(jb -> ((JMenuBar) jb).getMenu(2).getMenuComponent(6)) // a.k.a "Sketch/Include Library"
+                    .filter(jm -> jm instanceof JMenu)
+                    .map(jm -> (JMenu) jm)
+                    .findFirst()
+                    .ifPresent(im -> Base.INSTANCE.rebuildImportMenu(im));
+
+            Stream.of(editor.getContentPane().getParent().getComponents())
+                    .filter(c -> c instanceof JMenuBar)
+                    .map(jb -> ((JMenuBar) jb).getMenu(0).getMenuComponent(4)) // a.k.a "File/Examples"
+                    .map(jm -> (JMenu) jm)
+                    .findFirst()
+                    .ifPresent(em -> Base.INSTANCE.rebuildExamplesMenu(em));
+
         } catch (Exception e) {
             System.err.println(e);
             editor.statusError(e);
             return -1;
         }
-        System.out.println("\nDone:");
-
-        librariesToInstall.forEach(l -> System.out.printf("%s %s%n", l.getName(), l.getParsedVersion()));
+        System.out.println(" done:");
+        librariesToInstall.forEach(l -> System.out.printf("  %s %s%n", l.getName(), l.getParsedVersion()));
 
         return librariesToInstall.size();
     }
