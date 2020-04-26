@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <name>Drizzle</name>
+    <description>Lightweight dependency helper tool for Arduino</description>
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+            <comments>A business-friendly OSS license</comments>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:git@github.com:zhgzhg/drizzle.git</connection>
+        <developerConnection>scm:git:git@github.com:zhgzhg/drizzle.git</developerConnection>
+        <url>https://github.com/zhgzhg/drizzle</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <groupId>com.github.zhgzhg</groupId>
+    <artifactId>drizzle</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+
+    <properties>
+        <maven.compiler.source>1.8</maven.compiler.source>
+        <maven.compiler.target>1.8</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <arduino-version>1.8.12</arduino-version>
+        <antlr4-version>4.5.2-1</antlr4-version>
+        <semver4j-version>0.16.4</semver4j-version>
+
+        <download-maven-plugin-version>1.5.1</download-maven-plugin-version>
+        <maven-assembly-plugin-version>3.2.0</maven-assembly-plugin-version>
+        <maven-release-plugin-version>3.0.0-M1</maven-release-plugin-version>
+    </properties>
+
+    <dependencies>
+
+        <dependency>
+            <groupId>com.github.gundy</groupId>
+            <artifactId>semver4j</artifactId>
+            <version>${semver4j-version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.antlr</groupId>
+                    <artifactId>antlr4-runtime</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>org.antlr</groupId>
+            <artifactId>antlr4-runtime</artifactId>
+            <version>${antlr4-version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>cc.arduino</groupId>
+            <artifactId>arduino-core</artifactId>
+            <version>${arduino-version}</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/arduino-${arduino-version}/lib/arduino-core.jar</systemPath>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>processing</groupId>
+            <artifactId>pde</artifactId>
+            <version>${arduino-version}</version>
+            <scope>system</scope>
+            <systemPath>${project.basedir}/arduino-${arduino-version}/lib/pde.jar</systemPath>
+            <optional>true</optional>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.googlecode.maven-download-plugin</groupId>
+                <artifactId>download-maven-plugin</artifactId>
+                <version>${download-maven-plugin-version}</version>
+                <executions>
+                    <execution>
+                        <id>install-arduino-libs</id>
+                        <phase>none</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>http://downloads.arduino.cc/arduino-${arduino-version}-linux64.tar.xz</url>
+                            <unpack>true</unpack>
+                            <outputDirectory>${project.basedir}</outputDirectory>
+                            <skipCache>true</skipCache>
+                        </configuration>
+                    </execution>
+
+                    <!--<execution>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>wget</goal>
+                        </goals>
+                        <configuration>
+                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/master/cpp/CPP14.g4</url>
+                            <outputFileName>CPP14.g4</outputFileName>
+                            <outputDirectory>${project.build.sourceDirectory}/../antlr4/com/github/zhgzhg/drizzle/parser</outputDirectory>
+                        </configuration>
+                    </execution>-->
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.antlr</groupId>
+                <artifactId>antlr4-maven-plugin</artifactId>
+                <version>${antlr4-version}</version>
+                <executions>
+                    <execution>
+                        <id>antlr</id>
+                        <goals>
+                            <goal>antlr4</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirectory>${project.build.sourceDirectory}/../antlr4</sourceDirectory>
+                            <visitor>true</visitor>
+                            <listener>true</listener>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>${maven-assembly-plugin-version}</version>
+                <configuration>
+                    <finalName>drizzle-${project.version}</finalName>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                    <archive>
+                        <manifestEntries>
+                            <Automatic-Module-Name>com.github.zhgzhg.drizzle</Automatic-Module-Name>
+                            <Implementation-Version>${project.version}</Implementation-Version>
+                        </manifestEntries>
+                    </archive>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>${maven-release-plugin-version}</version>
+                <configuration>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <goals>deploy</goals>
+                    <tagNameFormat>@{project.version}</tagNameFormat>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
