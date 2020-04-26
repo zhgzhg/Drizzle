@@ -80,9 +80,8 @@ Supported Markers
 CLI Extras
 ----------
 
-In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON.
-
-For e.g: `java -jar drizzle-0.3.0.jar --parse hello-world.ino` will produce:
+In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format.
+For e.g. `java -jar drizzle-0.3.0.jar --parse hello-world.ino` will produce:
 
 ```
 {
