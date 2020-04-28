@@ -16,6 +16,7 @@ import processing.app.Base;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
 import processing.app.EditorConsole;
+import processing.app.I18n;
 import processing.app.PreferencesData;
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
@@ -35,7 +36,7 @@ import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
-    public static final String BOARD_MENU_PREFIX_LABEL = "Board:";
+    public static final String BOARD_MENU_PREFIX_LABEL = "Board: ";
     private Editor editor;
     private ContributionInstaller contributionInstaller;
     private LibrariesIndex librariesIndex;
@@ -145,7 +146,6 @@ public class Drizzle implements Tool {
             return -1;
         }
 
-
         TargetPlatform targetPlatform = targetBoard.getContainerPlatform();
         TargetPackage targetPackage = targetPlatform.getContainerPackage();
         if (PreferencesData.get("target_package", "").equals(targetPackage.getId())
@@ -155,34 +155,18 @@ public class Drizzle implements Tool {
             return -1;
         }
 
-        BaseNoGui.selectBoard(targetBoard);
-        BaseNoGui.onBoardOrPortChange();
-        this.logProxy.cliInfo("Selected board %s%n", targetBoard.getName());
         try {
-            Base.INSTANCE.getBoardsCustomMenus().stream()
-                    .filter(menu -> menu.getText().startsWith(BOARD_MENU_PREFIX_LABEL))
-                    .limit(1)
+            Base.INSTANCE.getBoardsCustomMenus()
                     .forEach(b -> {
                         Container parent = b.getParent();
-                        if (parent != null)
+                        if (parent != null) {
                             parent.remove(b);
+                        }
                     });
+            BaseNoGui.selectBoard(targetBoard);
+            BaseNoGui.onBoardOrPortChange();
             Base.INSTANCE.rebuildBoardsMenu();
-        } catch (Exception e) {
-            e.printStackTrace(System.err);
-        }
-
-        try {
-            // Unlikely
-            Base.INSTANCE.getBoardsCustomMenus().stream()
-                    .filter(menu -> menu.getText().startsWith(BOARD_MENU_PREFIX_LABEL))
-                    .flatMap(menu -> Stream.of(menu.getMenuComponents()))
-                    .filter(component -> component instanceof JMenuItem && ((JMenuItem) component).getText().equals(board.name))
-                    .map(component -> (JMenuItem) component)
-                    .forEach(item -> {
-                        this.logProxy.cliInfo("Re-selecting board %s%n", item.getText());
-                        item.doClick();
-                    });
+            this.logProxy.cliInfo("Selected board %s%n", targetBoard.getName());
         } catch (Exception e) {
             e.printStackTrace(System.err);
         }
@@ -285,7 +269,7 @@ public class Drizzle implements Tool {
     private void rebuildBoardMenuUI() {
         try {
             Base.INSTANCE.getBoardsCustomMenus().stream()
-                    .filter(menu -> menu.getText().startsWith(BOARD_MENU_PREFIX_LABEL))
+                    .filter(menu -> menu.getText().startsWith(I18n.tr(BOARD_MENU_PREFIX_LABEL)))
                     .limit(1)
                     .forEach(b -> {
                         Container parent = b.getParent();
