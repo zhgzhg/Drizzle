@@ -18,6 +18,8 @@ import processing.app.Editor;
 import processing.app.EditorConsole;
 import processing.app.PreferencesData;
 import processing.app.debug.TargetBoard;
+import processing.app.debug.TargetPackage;
+import processing.app.debug.TargetPlatform;
 import processing.app.tools.Tool;
 
 import javax.swing.*;
@@ -140,6 +142,16 @@ public class Drizzle implements Tool {
 
         if (targetBoard == null) {
             this.logProxy.cliErrorln("Failed to pick board based on " + board);
+            return -1;
+        }
+
+
+        TargetPlatform targetPlatform = targetBoard.getContainerPlatform();
+        TargetPackage targetPackage = targetPlatform.getContainerPackage();
+        if (PreferencesData.get("target_package", "").equals(targetPackage.getId())
+                && PreferencesData.get("target_platform", "").equals(targetPlatform.getId())
+                && PreferencesData.get("board", "").equals(targetBoard.getId())) {
+            this.logProxy.cliInfo("Board %s is already selected%n", targetBoard.getName());
             return -1;
         }
 
