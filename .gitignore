@@ -1,5 +1,5 @@
 .idea/
-arduino*/
+arduino-*/
 target/
 *.iml
 pom.xml.releaseBackup
