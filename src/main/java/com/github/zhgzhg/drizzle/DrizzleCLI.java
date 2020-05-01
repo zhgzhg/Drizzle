@@ -95,7 +95,8 @@ public class DrizzleCLI {
             if (projSettings.boardManager != null) {
                 System.out.printf("%s %s::%s%s%n", SourceExtractor.BOARDMANAGER_MARKER, projSettings.boardManager.platform,
                         projSettings.boardManager.version,
-                        (projSettings.boardManager.url != null ? "::" + projSettings.boardManager.url : "")
+                        (projSettings.boardManager.url != null && !projSettings.boardManager.url.isEmpty() ?
+                                "::" + projSettings.boardManager.url : "")
                 );
             }
 
@@ -156,12 +157,12 @@ public class DrizzleCLI {
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         Map<String, String> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
 
-        Map<String, Object> result = new LinkedHashMap<>(3);
-        result.put("board_manager", boardManager);
-        result.put("board", board);
-        result.put("libraries", libraries);
+        ProjectSettings projectSettings = new ProjectSettings();
+        projectSettings.setBoardManager(boardManager);
+        projectSettings.setBoard(board);
+        projectSettings.setLibraries(libraries);
 
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
-        System.out.println(gson.toJson(result));
+        System.out.println(gson.toJson(projectSettings));
     }
 }
