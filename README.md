@@ -93,7 +93,9 @@ Supported Markers
 CLI Extras
 ----------
 
-In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format.
+In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format and the reverse
+operation too.
+
 For e.g. `java -jar drizzle-0.4.0.jar --parse hello-world.ino` will produce:
 
 ```
@@ -115,8 +117,7 @@ For e.g. `java -jar drizzle-0.4.0.jar --parse hello-world.ino` will produce:
 }
 ```
 
-Performing the reverse process (from JSON to text markers) is also possible. Executing for instance
-`java -jar drizzle-0.4.0.jar --rev-parse hello-world.json` will produce:
+Executing `java -jar drizzle-0.4.0.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
