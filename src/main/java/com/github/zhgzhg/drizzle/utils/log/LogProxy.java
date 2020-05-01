@@ -1,4 +1,4 @@
-package com.github.zhgzhg.drizzle.utils;
+package com.github.zhgzhg.drizzle.utils.log;
 
 public class LogProxy {
     public void cliError(String format, Object... params) {
