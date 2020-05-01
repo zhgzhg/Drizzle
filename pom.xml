@@ -6,10 +6,10 @@
     <description>Lightweight dependency helper tool for Arduino</description>
     <licenses>
         <license>
-            <name>Apache License, Version 2.0</name>
-            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <name>LGPL 2.1</name>
+            <url>https://www.gnu.org/licenses/old-licenses/lgpl-2.1.txt</url>
             <distribution>repo</distribution>
-            <comments>A business-friendly OSS license</comments>
+            <comments>GNU LESSER GENERAL PUBLIC LICENSE 2.1</comments>
         </license>
     </licenses>
 
