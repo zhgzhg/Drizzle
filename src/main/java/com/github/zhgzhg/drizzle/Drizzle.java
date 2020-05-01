@@ -9,9 +9,10 @@ import cc.arduino.contributions.packages.ContributedPackage;
 import cc.arduino.contributions.packages.ContributedPlatform;
 import cc.arduino.contributions.packages.ContributionInstaller;
 import com.github.gundy.semver4j.SemVer;
-import com.github.zhgzhg.drizzle.utils.LogProxy;
-import com.github.zhgzhg.drizzle.utils.ProgressPrinter;
-import com.github.zhgzhg.drizzle.utils.SourceExtractor;
+import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
+import com.github.zhgzhg.drizzle.utils.log.LogProxy;
+import com.github.zhgzhg.drizzle.utils.log.ProgressPrinter;
+import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
 import processing.app.Base;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
@@ -25,7 +26,18 @@ import processing.app.tools.Tool;
 
 import javax.swing.*;
 import java.awt.*;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URL;
+import java.nio.channels.Channels;
+import java.nio.channels.FileChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -110,7 +122,7 @@ public class Drizzle implements Tool {
 
             if (selectBoard() == 0) {
                 this.logProxy.cliInfoln("No default board specified with " + SourceExtractor.BOARDNAME_MARKER +
-                        " marker in the main sketch was found");
+                        " marker in the main sketch file was found");
             }
         }).start();
     }
@@ -327,8 +339,9 @@ public class Drizzle implements Tool {
         }
 
         List<ContributedLibrary> librariesToInstall = new ArrayList<>();
+        int installedLibrariesCount = 0;
 
-        for (Map.Entry<String, String> entry  : requiredLibs.entrySet()) {
+        for (Map.Entry<String, String> entry : requiredLibs.entrySet()) {
             String libName = entry.getKey();
             String libVer = entry.getValue();
 
@@ -338,6 +351,12 @@ public class Drizzle implements Tool {
                     installCandidates.stream().map(ContributedLibrary::getParsedVersion).collect(Collectors.toList());
 
             this.logProxy.cliInfo("%s candidates: %s, required: %s%n", libName, installCandidateVersions.toString(), libVer);
+
+            if (installLibraryFromURI(libVer)) {
+                ++installedLibrariesCount;
+                continue;
+            }
+
             String chosenVersion = SemVer.maxSatisfying(installCandidateVersions, libVer);
             if (chosenVersion != null && !chosenVersion.isEmpty()) {
                 int libIndex = installCandidateVersions.indexOf(chosenVersion);
@@ -377,6 +396,86 @@ public class Drizzle implements Tool {
         this.logProxy.cliInfoln(" done:");
         librariesToInstall.forEach(l -> logProxy.cliInfo("  %s %s%n", l.getName(), l.getParsedVersion()));
 
-        return librariesToInstall.size();
+        return librariesToInstall.size() + installedLibrariesCount;
+    }
+
+    private boolean installLibraryFromURI(String libUri) {
+        URL url;
+        URI uri;
+
+        try {
+            uri = new URI(libUri);
+            url = uri.toURL();
+        } catch (URISyntaxException e) {
+            return false;
+        } catch (MalformedURLException e) {
+            this.logProxy.cliError("Failed extracting URL from %s%n", libUri);
+            return false;
+        }
+
+        if (uri.getScheme().toLowerCase().startsWith("http")) {
+            if (!uri.getPath().toLowerCase().endsWith(".zip")) {
+                this.logProxy.cliError("The extenal URL library must be a concrete ZIP file - '%s'! Skipping it!%n", libUri);
+                return true;
+            }
+
+            this.logProxy.cliInfo("ZIP URI detected! Picked %s%n", libUri);
+
+            File tempFile;
+            try {
+                tempFile = Files.createTempFile("ard-drizzle-ext-lib", ".zip").toFile();
+                tempFile.deleteOnExit();
+            } catch (IOException e) {
+                this.logProxy.cliError("Failed creating temporary file for downloading the external library %s%n", libUri);
+                return true;
+            }
+
+            try (ReadableByteChannel readableByteChannel = Channels.newChannel(url.openStream());
+                    FileChannel fileOutputChannel = new FileOutputStream(tempFile).getChannel()) {
+
+                long bytesTransferred = fileOutputChannel.transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
+                if (bytesTransferred < 1)
+                    throw new IOException("File of 0 bytes size");
+
+                ExternLibFileInstaller installer = new ExternLibFileInstaller(this.logProxy);
+                if (installer.installZipOrDirWithZips(tempFile)) {
+                    installer.logSuccessfullyInstalledLib(libUri);
+                }
+
+            } catch (IOException e) {
+                this.logProxy.cliError("Failed transferring %s:%n", libUri);
+                this.logProxy.cliErrorln(e);
+
+            }
+
+            new Thread(() -> {
+                try {
+                    Thread.sleep(2000);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                removeFile(tempFile);
+            }).start();
+
+            return true;
+        }
+
+        this.logProxy.cliInfo("URI detected! Picked %s%n", libUri);
+        File f = new File(uri);
+
+        ExternLibFileInstaller installer = new ExternLibFileInstaller(this.logProxy);
+        if (installer.installZipOrDirWithZips(f)) {
+            installer.logSuccessfullyInstalledLib(libUri);
+        }
+
+        return true;
+    }
+
+    private void removeFile(File tempFile) {
+        try {
+            Files.deleteIfExists(tempFile.toPath());
+        } catch (IOException e) {
+            this.logProxy.cliErrorln(e);
+        }
     }
 }
