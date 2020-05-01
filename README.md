@@ -113,7 +113,19 @@ For e.g. `java -jar drizzle-0.4.0.jar --parse hello-world.ino` will produce:
         "Arduino Cloud Provider Examples": "*"
     }
 }
-```  
+```
+
+Performing the reverse process (from JSON to text markers) is also possible. Executing for instance
+`java -jar drizzle-0.4.0.jar --rev-parse hello-world.json` will produce:
+
+```
+@BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
+@Board esp8266::NodeMCU 1.0 (ESP-12E Module)
+@DependsOn Arduino_CRC32::1.0.0
+@DependsOn Arduino Cloud Provider Examples::*
+@DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
+```
+
 
 How To Compile
 --------------
