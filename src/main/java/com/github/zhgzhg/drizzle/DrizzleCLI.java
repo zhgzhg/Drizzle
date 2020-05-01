@@ -105,7 +105,7 @@ public class DrizzleCLI {
 
             if (projSettings.libraries != null) {
                 projSettings.libraries.forEach((k, v) ->
-                    System.out.printf("%s %s::%s%n", SourceExtractor.DEPENDSON_MARKER, k, v);
+                    System.out.printf("%s %s::%s%n", SourceExtractor.DEPENDSON_MARKER, k, v)
                 );
             }
 
