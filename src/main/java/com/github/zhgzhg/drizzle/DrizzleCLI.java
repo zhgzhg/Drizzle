@@ -11,7 +11,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 public class DrizzleCLI {
@@ -88,7 +87,7 @@ public class DrizzleCLI {
         Gson gson = new GsonBuilder().create();
         try {
             ProjectSettings projSettings = gson.fromJson(new FileReader(jsonFile), ProjectSettings.class);
-            if (projSettings != null && !projSettings.containsData()) {
+            if (projSettings == null || !projSettings.containsData()) {
                 throw new IllegalStateException("Unable to generate Drizzle markers from the JSON");
             }
 
@@ -105,9 +104,9 @@ public class DrizzleCLI {
             }
 
             if (projSettings.libraries != null) {
-                projSettings.libraries.forEach((k, v) -> {
+                projSettings.libraries.forEach((k, v) ->
                     System.out.printf("%s %s::%s%n", SourceExtractor.DEPENDSON_MARKER, k, v);
-                });
+                );
             }
 
         } catch (IllegalStateException | FileNotFoundException e) {
@@ -130,18 +129,22 @@ public class DrizzleCLI {
         SourceExtractor sourceExtractor = new SourceExtractor(new LogProxy() {
             @Override
             public void cliError(final String format, final Object... params) {
+                // silence it to not polute the CLI output. the exit codes will be still available
             }
 
             @Override
             public void cliErrorln() {
+                // silence it to not polute the CLI output. the exit codes will be still available
             }
 
             @Override
             public void cliErrorln(final String msg) {
+                // silence it to not polute the CLI output. the exit codes will be still available
             }
 
             @Override
             public void cliErrorln(final Throwable t) {
+                // silence it to not polute the CLI output. the exit codes will be still available
             }
         });
 
