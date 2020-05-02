@@ -10,6 +10,7 @@ import cc.arduino.contributions.packages.ContributedPlatform;
 import cc.arduino.contributions.packages.ContributionInstaller;
 import com.github.gundy.semver4j.SemVer;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
+import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.log.ProgressPrinter;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
@@ -17,19 +18,16 @@ import processing.app.Base;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
 import processing.app.EditorConsole;
-import processing.app.I18n;
 import processing.app.PreferencesData;
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
 import processing.app.debug.TargetPlatform;
 import processing.app.tools.Tool;
 
-import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -42,27 +40,28 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
-    public static final String BOARD_MENU_PREFIX_LABEL = "Board: ";
+    public static final String MENU_TITLE = "Bulk Resolve Marked Dependencies";
+
+    private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
     private ContributionInstaller contributionInstaller;
     private LibrariesIndex librariesIndex;
     private LibraryInstaller libraryInstaller;
     private SourceExtractor sourceExtractor;
-    private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
 
     private ProgressListener progressListener;
     private ProgressPrinter progressPrinter;
     private LogProxy logProxy;
+    private UILocator uiLocator;
 
     @Override
     public void init(final Editor editor) {
         this.editor = editor;
+        this.uiLocator = new UILocator(editor);
         this.logProxy = new LogProxy() {
             @Override
             public void uiError(final String format, final Object... params) { editor.statusError(String.format(format, params)); }
@@ -84,24 +83,12 @@ public class Drizzle implements Tool {
 
     @Override
     public String getMenuTitle() {
-        return "Bulk Resolve Marked Dependencies";
+        return MENU_TITLE;
     }
 
     @Override
     public void run() {
-        Optional<EditorConsole> console = Stream.of(editor.getContentPane().getComponents())
-                .filter(c -> c instanceof JPanel)
-                .flatMap(c -> Stream.of(((JPanel) c).getComponents()))
-                .filter(c -> c instanceof Box)
-                .flatMap(c -> Stream.of(((Box) c).getComponents()))
-                .filter(c -> c instanceof JSplitPane)
-                .flatMap(c -> Stream.of(((JSplitPane) c).getComponents()))
-                .filter(c -> c instanceof JPanel)
-                .flatMap(c -> Stream.of(((JPanel) c).getComponents()))
-                .filter(c -> c instanceof EditorConsole)
-                .map(c -> (EditorConsole) c)
-                .findFirst();
-        console.ifPresent(EditorConsole::clear);
+        uiLocator.editorConsole().ifPresent(EditorConsole::clear);
 
         this.logProxy.uiInfo("                                                                                                                                                                                                               ");
 
@@ -168,7 +155,7 @@ public class Drizzle implements Tool {
         }
 
         try {
-            Base.INSTANCE.getBoardsCustomMenus()
+            this.uiLocator.customMenusForCurrentlySelectedBoard()
                     .forEach(b -> {
                         Container parent = b.getParent();
                         if (parent != null) {
@@ -280,15 +267,11 @@ public class Drizzle implements Tool {
 
     private void rebuildBoardMenuUI() {
         try {
-            Base.INSTANCE.getBoardsCustomMenus().stream()
-                    .filter(menu -> menu.getText().startsWith(I18n.tr(BOARD_MENU_PREFIX_LABEL)))
-                    .limit(1)
-                    .forEach(b -> {
-                        Container parent = b.getParent();
-                        if (parent != null)
-                            parent.remove(b);
-                    });
-
+            this.uiLocator.boardsMenu().ifPresent(bm -> {
+                Container parent = bm.getParent();
+                if (parent != null)
+                    parent.remove(bm);
+            });
             BaseNoGui.initPackages();
             Base.INSTANCE.rebuildBoardsMenu();
             Base.INSTANCE.rebuildProgrammerMenu();
@@ -373,21 +356,8 @@ public class Drizzle implements Tool {
             this.progressPrinter.begin(1, 5, 80, ".");
             this.libraryInstaller.install(librariesToInstall, progressListener);
 
-            Stream.of(editor.getContentPane().getParent().getComponents())
-                    .filter(c -> c instanceof JMenuBar)
-                    .map(jb -> ((JMenuBar) jb).getMenu(2).getMenuComponent(6)) // a.k.a "Sketch/Include Library"
-                    .filter(jm -> jm instanceof JMenu)
-                    .map(jm -> (JMenu) jm)
-                    .findFirst()
-                    .ifPresent(im -> Base.INSTANCE.rebuildImportMenu(im));
-
-            Stream.of(editor.getContentPane().getParent().getComponents())
-                    .filter(c -> c instanceof JMenuBar)
-                    .map(jb -> ((JMenuBar) jb).getMenu(0).getMenuComponent(4)) // a.k.a "File/Examples"
-                    .map(jm -> (JMenu) jm)
-                    .findFirst()
-                    .ifPresent(em -> Base.INSTANCE.rebuildExamplesMenu(em));
-
+            this.uiLocator.sketchIncludeLibraryMenu().ifPresent(im -> Base.INSTANCE.rebuildImportMenu(im));
+            this.uiLocator.filesExamplesMenu().ifPresent(em -> Base.INSTANCE.rebuildExamplesMenu(em));
         } catch (Exception e) {
             this.logProxy.cliErrorln(e);
             this.logProxy.uiError(e.getMessage());
@@ -448,14 +418,7 @@ public class Drizzle implements Tool {
 
             }
 
-            new Thread(() -> {
-                try {
-                    Thread.sleep(2000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                removeFile(tempFile);
-            }).start();
+            delayedFileRemoval(2000, tempFile);
 
             return true;
         }
@@ -469,6 +432,19 @@ public class Drizzle implements Tool {
         }
 
         return true;
+    }
+
+    private void delayedFileRemoval(long millis, File tempFile) {
+        new Thread(() -> {
+            try {
+                Thread.sleep(millis);
+            } catch (InterruptedException e) {
+                e.printStackTrace(System.err);
+                Thread.currentThread().interrupt();
+            } finally {
+                removeFile(tempFile);
+            }
+        }).start();
     }
 
     private void removeFile(File tempFile) {
