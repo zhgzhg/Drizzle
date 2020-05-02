@@ -1,9 +1,13 @@
 Drizzle
 =======
+
 A lightweight dependency helper for Arduino IDE.
 
-By clicking on "Tools / Bulk Resolve Marked Dependencies" it will download the libraries and platform specified into the comments of your
-sketch file.
+Drizzle provides an optional, extremely thin dependency management functionality layer, based on Arduino IDE's existing features,
+self-contained within the sketch file's comments.
+
+By clicking on "Tools / Bulk Resolve Marked Dependencies" it will download the libraries, platform, and set the board, all specified
+into the comments of your sketch file.
 
 ![Build Fat Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Fat%20Jar/badge.svg)
 
@@ -40,7 +44,10 @@ void loop() {
 ```
 Create a comment inside the main file of your Arduino sketch. Preferably at the beginning.
 
-Use markers like "@DependsOn" to describe sketch's requirements.
+Use markers like "@DependsOn", "@BoardManager", and "@Board" to describe sketch's requirements.
+Like that the code self-explains its dependencies, so anyone interested in compiling it can do that with 2 clicks.
+
+Using and combining Drizzle's markers is always optional. 
  
 
 How To Install
@@ -93,10 +100,10 @@ Supported Markers
 CLI Extras
 ----------
 
-In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format and the reverse
-operation too.
+In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse
+operation, where from JSON file Drizzle markers are produced is also possible.
 
-For e.g. `java -jar drizzle-0.4.0.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.4.1.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -117,7 +124,7 @@ For e.g. `java -jar drizzle-0.4.0.jar --parse hello-world.ino` will produce:
 }
 ```
 
-Executing `java -jar drizzle-0.4.0.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.4.1.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
