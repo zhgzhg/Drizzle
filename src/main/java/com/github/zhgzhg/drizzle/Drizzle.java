@@ -24,6 +24,7 @@ import processing.app.debug.TargetPackage;
 import processing.app.debug.TargetPlatform;
 import processing.app.tools.Tool;
 
+import javax.swing.*;
 import java.awt.*;
 import java.io.File;
 import java.io.FileOutputStream;
@@ -40,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class Drizzle implements Tool {
@@ -93,6 +95,9 @@ public class Drizzle implements Tool {
         this.logProxy.uiInfo("                                                                                                                                                                                                               ");
 
         new Thread(() -> {
+            Optional<JMenuItem> drizzleMenu = uiLocator.drizzleMenu();
+            drizzleMenu.ifPresent(dm -> dm.setEnabled(false));
+
             int installedBoardsCount = installBoards();
             if (installedBoardsCount == 0) {
                 this.logProxy.cliErrorln("No platform definitions managed by " + SourceExtractor.BOARDMANAGER_MARKER +
@@ -111,6 +116,8 @@ public class Drizzle implements Tool {
                 this.logProxy.cliInfoln("No default board specified with " + SourceExtractor.BOARDNAME_MARKER +
                         " marker in the main sketch file was found");
             }
+
+            drizzleMenu.ifPresent(dm -> dm.setEnabled(true));
         }).start();
     }
 

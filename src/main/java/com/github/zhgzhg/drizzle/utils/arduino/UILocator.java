@@ -35,11 +35,12 @@ public class UILocator {
                 .findFirst();
     }
 
-    public Optional<JMenu> drizzleMenu() {
+    public Optional<JMenuItem> drizzleMenu() {
         return Stream.of(editor.getContentPane().getParent().getComponents())
                 .filter(c -> c instanceof JMenuBar)
-                .flatMap(jb -> Stream.of((JMenu[]) ((JMenuBar) jb).getMenu(3).getMenuComponents()))
-                .filter(c -> Drizzle.MENU_TITLE.equals(c.getText()))
+                .flatMap(jb -> Stream.of(((JMenuBar) jb).getMenu(3).getMenuComponents()))
+                .filter(c -> c instanceof JMenuItem && Drizzle.MENU_TITLE.equals(((JMenuItem)c).getText()))
+                .map(c -> (JMenuItem) c)
                 .findFirst();
     }
 
