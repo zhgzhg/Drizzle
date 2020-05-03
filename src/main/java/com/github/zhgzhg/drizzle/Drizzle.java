@@ -377,6 +377,8 @@ public class Drizzle implements Tool {
     }
 
     private boolean installLibraryFromURI(String libUri) {
+        if ("*".equals(libUri)) return false;
+
         URL url;
         URI uri;
 
@@ -385,7 +387,7 @@ public class Drizzle implements Tool {
             url = uri.toURL();
         } catch (URISyntaxException e) {
             return false;
-        } catch (MalformedURLException e) {
+        } catch (Exception e) {
             this.logProxy.cliError("Failed extracting URL from %s%n", libUri);
             return false;
         }
