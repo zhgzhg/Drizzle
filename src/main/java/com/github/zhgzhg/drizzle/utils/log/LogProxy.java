@@ -1,6 +1,12 @@
 package com.github.zhgzhg.drizzle.utils.log;
 
+import java.io.PrintStream;
+
 public class LogProxy {
+    public PrintStream stderr() { return System.err; }
+
+    public PrintStream stdout() { return System.out; }
+
     public void cliError(String format, Object... params) {
         System.err.printf(format, params);
     }

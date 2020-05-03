@@ -174,7 +174,7 @@ public class Drizzle implements Tool {
             Base.INSTANCE.rebuildBoardsMenu();
             this.logProxy.cliInfo("Selected board %s%n", targetBoard.getName());
         } catch (Exception e) {
-            e.printStackTrace(System.err);
+            e.printStackTrace(this.logProxy.stderr());
         }
 
         return 1;
@@ -204,7 +204,7 @@ public class Drizzle implements Tool {
         try {
             this.contributionInstaller.deleteUnknownFiles(downloadedPackageIndexFiles);
         } catch (IOException e) {
-            e.printStackTrace(System.err);
+            e.printStackTrace(this.logProxy.stderr());
             return 0;
         }
         this.logProxy.cliInfoln(" done!\n");
@@ -446,7 +446,7 @@ public class Drizzle implements Tool {
             try {
                 Thread.sleep(millis);
             } catch (InterruptedException e) {
-                e.printStackTrace(System.err);
+                e.printStackTrace(this.logProxy.stderr());
                 Thread.currentThread().interrupt();
             } finally {
                 removeFile(tempFile);

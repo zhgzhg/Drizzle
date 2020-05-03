@@ -122,7 +122,7 @@ public class SourceExtractor {
 
             return result;
         } catch (IOException e) {
-            e.printStackTrace();
+            e.printStackTrace(this.logProxy.stderr());
         }
 
         return null;
@@ -166,7 +166,7 @@ public class SourceExtractor {
                 return new BoardManager(result.getKey(), result.getValue().get(VER_GROUP), result.getValue().get(URL_GROUP));
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            e.printStackTrace(this.logProxy.stderr());
         }
 
         return null;
@@ -177,7 +177,7 @@ public class SourceExtractor {
             return extractMarkersKeyValue(
                     extractAllCommentsFromSource(source), DEPENDS_ON_LIB_VERSION, DEPENDSON_MARKER, LIB_GROUP, VER_GROUP);
         } catch (IOException e) {
-            e.printStackTrace(System.err);
+            e.printStackTrace(this.logProxy.stderr());
         }
         return Collections.emptyMap();
     }
