@@ -100,21 +100,21 @@ public class Drizzle implements Tool {
 
             int installedBoardsCount = installBoards();
             if (installedBoardsCount == 0) {
-                this.logProxy.cliErrorln("No platform definitions managed by " + SourceExtractor.BOARDMANAGER_MARKER +
-                        " marker in the main sketch were found");
+                this.logProxy.cliErrorln("No platform definitions managed by " + SourceExtractor.BOARDMANAGER_MARKER
+                        + " marker in the main sketch were found");
             }
 
             int installedLibsCount = installLibraries();
             if (installedLibsCount < 0) {
-                String err = "Couldn't install some/any libraries - managed by marker " + SourceExtractor.DEPENDSON_MARKER +
-                        " in the main sketch!";
+                String err = "Couldn't install some/any libraries - managed by marker " + SourceExtractor.DEPENDSON_MARKER
+                        + " in the main sketch!";
                 this.logProxy.cliErrorln(err);
                 this.logProxy.uiInfo(err);
             }
 
             if (selectBoard() == 0) {
-                this.logProxy.cliInfoln("No default board specified with " + SourceExtractor.BOARDNAME_MARKER +
-                        " marker in the main sketch file was found");
+                this.logProxy.cliInfoln("No default board specified with " + SourceExtractor.BOARDNAME_MARKER
+                        + " marker in the main sketch file was found");
             }
 
             drizzleMenu.ifPresent(dm -> dm.setEnabled(true));
