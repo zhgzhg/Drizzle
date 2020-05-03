@@ -4,6 +4,11 @@
 
     <name>Drizzle</name>
     <description>Lightweight dependency helper tool for Arduino</description>
+    <url>https://github.com/zhgzhg/Drizzle</url>
+    <organization> <!-- an author actually -->
+        <name>zhgzhg</name>
+        <url>https://github.com/zhgzhg</url>
+    </organization>
     <licenses>
         <license>
             <name>LGPL 2.1</name>
@@ -147,13 +152,12 @@
                     </descriptorRefs>
                     <archive>
                         <manifest>
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+                            <addDefaultSpecificationEntries>true</addDefaultSpecificationEntries>
                             <mainClass>com.github.zhgzhg.drizzle.DrizzleCLI</mainClass>
                         </manifest>
                         <manifestEntries>
                             <Automatic-Module-Name>com.github.zhgzhg.drizzle</Automatic-Module-Name>
-                            <Implementation-Title>Drizzle</Implementation-Title>
-                            <Implementation-Version>${project.version}</Implementation-Version>
-                            <Implementation-Vendor>zhgzhg</Implementation-Vendor>
                         </manifestEntries>
                     </archive>
                 </configuration>
