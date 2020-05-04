@@ -451,16 +451,30 @@ public class Drizzle implements Tool {
                 e.printStackTrace(this.logProxy.stderr());
                 Thread.currentThread().interrupt();
             } finally {
-                removeFile(tempFile);
+                try {
+                    Files.deleteIfExists(tempFile.toPath());
+                } catch (IOException e) {
+                    this.logProxy.cliErrorln(e);
+                }
             }
         }).start();
     }
 
-    private void removeFile(File tempFile) {
+    private int selectBoardOptions() {
+        String source;
         try {
-            Files.deleteIfExists(tempFile.toPath());
+            source = SourceExtractor.loadSourceFromPrimarSketch(editor);
         } catch (IOException e) {
             this.logProxy.cliErrorln(e);
+            this.logProxy.uiError(e.getMessage());
+            return -1;
         }
+
+        List<SourceExtractor.BoardSettings> boardSettings =
+                this.sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
+
+        System.out.println(boardSettings);
+
+        return 0;
     }
 }

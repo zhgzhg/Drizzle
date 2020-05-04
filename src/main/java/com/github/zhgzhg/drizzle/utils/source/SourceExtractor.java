@@ -22,8 +22,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -34,12 +36,15 @@ public class SourceExtractor {
     public static final String DEPENDSON_MARKER = "@DependsOn";
     public static final String BOARDMANAGER_MARKER = "@BoardManager";
     public static final String BOARDNAME_MARKER = "@Board";
+    public static final String BOARDSETTINGS_MARKER = "@BoardSettings";
+
 
     public static final String PLATFORM_GROUP = "platform";
     public static final String LIB_GROUP = "lib";
     public static final String VER_GROUP = "ver";
     public static final String URL_GROUP = "url";
     public static final String BOARD_GROUP = "board";
+    public static final String MENU_GROUP = "boardmenu";
 
 
     public static final Pattern NEW_LINE_SPLITTER = Pattern.compile("\\R+");
@@ -50,8 +55,12 @@ public class SourceExtractor {
     public static final Pattern BOARD =
             Pattern.compile("^[^@]*" + BOARDNAME_MARKER + "\\s+(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">.+)$");
 
+    public static final Pattern BOARD_SETTINGS = Pattern.compile("^[^@]*"
+            + BOARDSETTINGS_MARKER + "\\s+(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">[^:]+)::(?<" + MENU_GROUP + ">.+)$");
+
     public static final Pattern DEPENDS_ON_LIB_VERSION =
             Pattern.compile("^[^@]*" + DEPENDSON_MARKER + "\\s+(?<" + LIB_GROUP + ">[^:]+)::(?<" + VER_GROUP + ">.+)$");
+
     private LogProxy logProxy;
 
     public static class BoardManager {
@@ -83,6 +92,38 @@ public class SourceExtractor {
         @Override
         public String toString() {
             return "Board{" + "platform='" + platform + '\'' + ", name='" + name + '\'' + '}';
+        }
+    }
+
+    public static class BoardSettings {
+        public final Board board;
+        public final List<List<String>> clickableOptions;
+
+        public BoardSettings(final Board board) {
+            Objects.requireNonNull(board);
+            this.board = board;
+            this.clickableOptions = new LinkedList<>();
+        }
+
+        public boolean suitsRequirements(String platformName, String boardName) {
+            boolean matching = ((platformName == null || platformName.isEmpty()) && (boardName == null || boardName.isEmpty()));
+
+            if (!matching) {
+                if (platformName != null && !platformName.isEmpty() && boardName != null && !boardName.isEmpty()) {
+                    matching = platformName.equals(board.platform) && boardName.equals(board.name);
+                } else if (platformName != null && !platformName.isEmpty()) {
+                    matching = platformName.equals(board.platform);
+                } else if (boardName != null && !boardName.isEmpty()) {
+                    matching = boardName.equals(board.name);
+                }
+            }
+
+            return matching;
+        }
+
+        @Override
+        public String toString() {
+            return "BoardSettings{" + "board=" + board + ", clickableOptions=" + clickableOptions + '}';
         }
     }
 
@@ -126,6 +167,45 @@ public class SourceExtractor {
         }
 
         return null;
+    }
+
+    public List<BoardSettings> dependentBoardClickableSettingsFromMainSketchSource(String source) {
+        try {
+            Map<String, Map<String, String>> boardAndClickableSettings = extractMarkersKeyAndParams(
+                    extractAllCommentsFromSource(source), BOARD_SETTINGS, BOARDSETTINGS_MARKER, PLATFORM_GROUP,
+                    Arrays.asList(BOARD_GROUP, MENU_GROUP)
+            );
+
+            List<BoardSettings> result = new ArrayList<>(boardAndClickableSettings.size());
+            boardAndClickableSettings.forEach((platformName, boardStuff) -> {
+                String boardName = boardStuff.get(BOARD_GROUP);
+                Board board = new Board(!platformName.equals("*") ? platformName : null, !"*".equals(boardName) ? boardName : null);
+                BoardSettings boardSettings = new BoardSettings(board);
+
+                String menus = boardStuff.get(MENU_GROUP);
+                if (menus == null && menus.isEmpty()) return;
+
+                List<String> menusToClick = Arrays.asList(menus.split("\\|\\|"));
+                int lastItemIdx = menusToClick.size() - 1;
+                if (menusToClick.get(lastItemIdx) == null || menusToClick.get(lastItemIdx).isEmpty()) {
+                    menusToClick.remove(lastItemIdx);
+                }
+                if (menusToClick.isEmpty()) return;
+
+                for (String mc : menusToClick) {
+                    List<String> path = Arrays.asList(mc.split("->"));
+                    boardSettings.clickableOptions.add(path);
+                }
+
+                result.add(boardSettings);
+            });
+
+            return result;
+        } catch (IOException e) {
+            e.printStackTrace(this.logProxy.stderr());
+        }
+
+        return Collections.emptyList();
     }
 
     public BoardManager dependentBoardManagerFromMainSketchSource(String source) {
