@@ -29,7 +29,6 @@ import java.awt.*;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -115,6 +114,11 @@ public class Drizzle implements Tool {
             if (selectBoard() == 0) {
                 this.logProxy.cliInfoln("No default board specified with " + SourceExtractor.BOARDNAME_MARKER
                         + " marker in the main sketch file was found");
+            }
+
+            if (selectBoardOptions() == 0) {
+                this.logProxy.cliInfo("No clickable board options specified with " + SourceExtractor.BOARDSETTINGS_MARKER
+                        + " marker were matched");
             }
 
             drizzleMenu.ifPresent(dm -> dm.setEnabled(true));
@@ -470,11 +474,47 @@ public class Drizzle implements Tool {
             return -1;
         }
 
-        List<SourceExtractor.BoardSettings> boardSettings =
-                this.sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
+        TargetPlatform targetPlatform = BaseNoGui.getTargetPlatform();
+        TargetBoard targetBoard = BaseNoGui.getTargetBoard();
 
-        System.out.println(boardSettings);
+        String targetPlatformName = (targetPlatform != null ? targetPlatform.getId() : null);
+        String targetBoardName = (targetBoard != null ? targetBoard.getName() : null);
 
-        return 0;
+        List<SourceExtractor.BoardSettings> settingsToClick =
+                this.sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source).stream()
+                        .filter(boardSettings -> boardSettings.suitsRequirements(targetPlatformName, targetBoardName))
+                        .collect(Collectors.toList());
+
+        int clickedItems = 0;
+
+        List<JMenu> jMenus = this.uiLocator.customMenusForCurrentlySelectedBoard();
+
+        for (SourceExtractor.BoardSettings bs : settingsToClick) {
+            for (List<String> menuPath : bs.clickableOptions) {
+
+                List<String> parents = (menuPath.size() > 1 ? menuPath.subList(0, menuPath.size() - 1) : Collections.emptyList());
+                String menuItem = (!parents.isEmpty() ? menuPath.get(menuPath.size() - 1) : menuPath.get(0));
+
+                JMenuItem me = this.uiLocator.walkTowardsMenuItem(jMenus, parents,
+                        (targetMenuName, currMenuName) -> {
+                            if (currMenuName != null) {
+                                currMenuName = currMenuName.split(":", 2)[0];
+                                return targetMenuName.equals(currMenuName);
+                            }
+
+                            return false;
+                        },
+                        menuItem::equals
+                );
+
+                if (me != null) {
+                    System.out.printf("Clicking on %s->%s%n", String.join("->", parents), me.getText());
+                    me.doClick();
+                    ++clickedItems;
+                }
+            }
+        }
+
+        return clickedItems;
     }
 }
