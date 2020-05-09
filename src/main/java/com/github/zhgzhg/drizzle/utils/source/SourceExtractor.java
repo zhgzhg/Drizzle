@@ -102,8 +102,8 @@ public class SourceExtractor {
         public BoardSettings(final Board board) {
             Objects.requireNonNull(board);
             this.board = new Board(
-                    (board.platform == null || "*".equals(board.platform) ? null : board.platform),
-                    (board.name == null || "*".equals(board.name) ? null : board.name)
+                    (board.platform == null || board.platform.isEmpty() || "*".equals(board.platform) ? null : board.platform),
+                    (board.name == null || board.name.isEmpty() || "*".equals(board.name) ? null : board.name)
             );
             this.clickableOptions = new LinkedList<>();
         }
