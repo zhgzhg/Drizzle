@@ -3,8 +3,8 @@ Drizzle
 
 A lightweight dependency helper for Arduino IDE.
 
-Drizzle provides an optional, extremely thin dependency management functionality layer, based on Arduino IDE's existing features,
-self-contained within the sketch file's comments.
+Drizzle provides an optional, thin dependency management functionality layer on top of Arduino IDE's existing features, self-contained
+within the sketch file's comments.
 
 By clicking on "Tools / Bulk Resolve Marked Dependencies" it will download the libraries, platform, and set the board, all specified
 into the comments of your sketch file.
@@ -23,6 +23,7 @@ How to Use
  *
  * @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
  * @Board esp8266::NodeMCU 1.0 (ESP-12E Module)
+ * @BoardSettings esp8266::NodeMCU 1.0 (ESP-12E Module)::Flash Frequency->40MHz||Flash Mode->QIO
  *
  * @DependsOn Arduino_CRC32::1.0.0
  * @DependsOn Arduino Cloud Provider Examples::*
@@ -54,7 +55,7 @@ How To Install
 --------------
 
 1. Download the "-dist" ZIP file from the [Releases](https://github.com/zhgzhg/Drizzle/releases).
-2. Unzip it inside **Arduino's installation directory / tools**
+2. Unzip it inside **Arduino's installation directory** / **tools**
 3. Restart Arduino IDE
 
 Supported Markers
@@ -97,13 +98,27 @@ Supported Markers
     * `@DependsOn Local BMP280_DEV::file:///C:/Users/John/Desktop/BMP280_DEV_DIRECTORY`
     * `@DependsOn Github's BMP280_DEV::https://github.com/MartinL1/BMP280_DEV/archive/master.zip`
 
+* __@BoardSettings__ _platform_name_::_board_name_::_menu_path_[->_option_][||_another_menu_path_->option]
+  * Clicks on the UI options provided by particular board (and platform)
+  * __More__ than 1 marker can be used.
+  * To match all platform and/or board names a * can be used
+  * To describe the path to the particular option -> can be used
+  * To separate multiple menu paths || can be used
+  * Menu matching is case-sensitive
+  * Menu matching will be performed in the order of definition and __will stop immediately once match is found__. Always define the
+    concrete rules in the beginning, and the less concrete at the end.  
+  * Examples:
+    * `@BoardSettings esp32::ESP32 Dev Module::Flash Frequency->40MHz`
+    * `@BoardSettings esp32::*::Flash Frequency->40MHz||PSRAM->Disabled`
+    * `@BoardSettings *::*::Upload Speed->115200`
+
 CLI Extras
 ----------
 
 In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse
 operation, where from JSON file Drizzle markers are produced is also possible.
 
-For e.g. `java -jar drizzle-0.4.1.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.5.0.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -116,6 +131,24 @@ For e.g. `java -jar drizzle-0.4.1.jar --parse hello-world.ino` will produce:
         "platform": "esp8266",
         "name": "NodeMCU 1.0 (ESP-12E Module)"
     },
+    "board_settings": [
+      {
+        "board": {
+          "platform": "esp8266",
+          "board": "NodeMCU 1.0 (ESP-12E Module)"
+        },
+        "clickable_options": [
+          [
+            "Flash Frequency",
+            "40MHz"
+          ],
+          [
+            "Flash Mode",
+            "QIO"
+          ]
+        ]
+      }
+    ],
     "libraries": {
         "BMP280_DEV": "(>= 1.0.8 && < 1.0.16)",
         "Arduino_CRC32": "1.0.0",
@@ -124,11 +157,12 @@ For e.g. `java -jar drizzle-0.4.1.jar --parse hello-world.ino` will produce:
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.4.1.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.5.0.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
 @Board esp8266::NodeMCU 1.0 (ESP-12E Module)
+@BoardSettings esp8266::NodeMCU 1.0 (ESP-12E Module)::Flash Frequency->40MHz||Flash Mode->QIO
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
 @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
