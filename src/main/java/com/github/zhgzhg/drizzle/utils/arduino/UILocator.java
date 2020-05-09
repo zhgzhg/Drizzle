@@ -10,6 +10,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.BiPredicate;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 public class UILocator {
@@ -76,6 +78,40 @@ public class UILocator {
                 .map(jb -> ((JMenuBar) jb).getMenu(0).getMenuComponent(4)) // a.k.a "File/Examples"
                 .map(jm -> (JMenu) jm)
                 .findFirst();
+    }
+
+    public JMenuItem walkTowardsMenuItem(
+            List<JMenu> menus, List<String> parents, BiPredicate<String, String> parentTitleMatcher, Predicate<String> goalMatcher) {
+
+        if (!parents.isEmpty()) {
+            JMenu menuContainer = null;
+
+            for (String parent : parents) {
+                menuContainer = menus.stream()
+                        .filter(menu -> parentTitleMatcher.test(parent, menu.getText()))
+                        .findFirst()
+                        .orElse(null);
+                if (menuContainer == null) {
+                    return null;
+                }
+            }
+
+            if (menuContainer == null) {
+                return null;
+            }
+
+            return Stream.of(menuContainer.getMenuComponents())
+                    .filter(c -> c instanceof JMenuItem && goalMatcher.test(((JMenuItem) c).getText()))
+                    .map(c -> (JMenuItem) c)
+                    .findFirst()
+                    .orElse(null);
+        }
+
+        return menus.stream()
+                .filter(m -> m instanceof JMenuItem && goalMatcher.test(m.getText()))
+                .map(m -> (JMenuItem) m)
+                .findFirst()
+                .orElse(null);
     }
 
 }
