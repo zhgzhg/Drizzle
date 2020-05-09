@@ -101,20 +101,23 @@ public class SourceExtractor {
 
         public BoardSettings(final Board board) {
             Objects.requireNonNull(board);
-            this.board = board;
+            this.board = new Board(
+                    (board.platform == null || "*".equals(board.platform) ? null : board.platform),
+                    (board.name == null || "*".equals(board.name) ? null : board.name)
+            );
             this.clickableOptions = new LinkedList<>();
         }
 
         public boolean suitsRequirements(String platformName, String boardName) {
-            boolean matching = ((platformName == null || platformName.isEmpty()) && (boardName == null || boardName.isEmpty()));
+            boolean matching = ((board.platform == null || board.platform.isEmpty()) && (board.name == null || board.name.isEmpty()));
 
             if (!matching) {
-                if (platformName != null && !platformName.isEmpty() && boardName != null && !boardName.isEmpty()) {
-                    matching = platformName.equals(board.platform) && boardName.equals(board.name);
-                } else if (platformName != null && !platformName.isEmpty()) {
-                    matching = platformName.equals(board.platform);
-                } else if (boardName != null && !boardName.isEmpty()) {
-                    matching = boardName.equals(board.name);
+                if (board.platform != null && !board.platform.isEmpty() && board.name != null && !board.name.isEmpty()) {
+                    matching = board.platform.equals(platformName) && board.name.equals(boardName);
+                } else if (board.platform != null && !board.platform.isEmpty()) {
+                    matching = board.platform.equals(platformName);
+                } else if (board.name != null && !board.name.isEmpty()) {
+                    matching = board.name.equals(boardName);
                 }
             }
 
