@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="281" height="200" preserveAspectRatio="xMinYMin meet" viewport="0 0 720 490" style="">
-    <rect id="backgroundrect" width="100%" height="100%" x="0" y="0" fill="#3C3F41" stroke="none" style="" class=""/>
+    <rect id="backgroundrect" width="100%" height="100%" x="0" y="0" fill="none" stroke="none" style="" class=""/>
     <title>Drizzle Logo</title>
     <style type="text/css">
         .arduino {
