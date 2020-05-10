@@ -322,18 +322,9 @@ public class SourceExtractor {
 
                 Token token = commonTokenStream.get(index);
 
-                if (token.getType() != CPP14Parser.Whitespace && token.getChannel() == CPP14Lexer.COMMENTS) {
-
-                    List<Token> hiddenTokensToLeft = commonTokenStream.getHiddenTokensToLeft(index);
-                    for (int i = 0; hiddenTokensToLeft != null && i < hiddenTokensToLeft.size(); i++)
-                    {
-                        if (hiddenTokensToLeft.get(i).getType() != CPP14Parser.Whitespace)
-                        {
-                            String comment = hiddenTokensToLeft.get(i).getText();
-                            result.add(comment);
-                        }
-                    }
-
+                if (token != null && token.getType() != CPP14Parser.Whitespace && token.getChannel() == CPP14Lexer.COMMENTS) {
+                    String comment = token.getText();
+                    result.add(comment);
                 }
             }
         }
