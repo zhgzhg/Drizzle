@@ -1,9 +1,8 @@
 Drizzle
 =======
+<img alt="Drizzle Logo" src="https://raw.githubusercontent.com/zhgzhg/Drizzle/master/drizzle-logo.svg?sanitize=true" />
 
 A lightweight dependency helper for Arduino IDE.
-
-![Drizzle Logo](drizzle-logo.svg)
 
 Drizzle provides an optional, thin dependency management functionality layer on top of Arduino IDE's existing features, self-contained
 within the sketch file's comments.
