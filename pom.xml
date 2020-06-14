@@ -42,6 +42,7 @@
         <junit-platform-launcher-version>1.6.2</junit-platform-launcher-version>
         <apiguardian-api-version>1.1.0</apiguardian-api-version>
 
+        <maven-surefire-plugin-version>3.0.0-M4</maven-surefire-plugin-version>
         <download-maven-plugin-version>1.6.0</download-maven-plugin-version>
         <maven-assembly-plugin-version>3.3.0</maven-assembly-plugin-version>
         <maven-shade-plugin-version>3.2.4</maven-shade-plugin-version>
@@ -169,6 +170,19 @@
                         </configuration>
                     </execution>
                 </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin-version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>org.apache.maven.surefire</groupId>
+                        <artifactId>surefire-logger-api</artifactId>
+                        <version>${maven-surefire-plugin-version}</version>
+                    </dependency>
+                </dependencies>
             </plugin>
 
             <plugin>
