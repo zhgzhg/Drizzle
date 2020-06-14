@@ -4,11 +4,12 @@ Drizzle
 
 A lightweight dependency helper for Arduino IDE.
 
-Drizzle provides an optional, thin dependency management functionality layer on top of Arduino IDE's existing features, self-contained
-within the sketch file's comments.
+By clicking on "Tools / Bulk Resolve Marked Dependencies" Drizzle will download the libraries, platform, set the board, and its specific
+settings, __all described into the comments of your sketch file__.
 
-By clicking on "Tools / Bulk Resolve Marked Dependencies" it will download the libraries, platform, set the board, and its specific
-settings, all described into the comments of your sketch file.
+Drizzle operates on top of Arduino IDE's library and board manager. It enables them to provide components, which now can be described into
+the sketch file's comments. Because the only change in the sketch is the addition of a few comments, the project will remain compatible with
+other Arduino IDEs that don't have Drizzle installed.
 
 ![Build Fat Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Fat%20Jar/badge.svg)
 
