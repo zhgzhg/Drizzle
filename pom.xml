@@ -22,12 +22,11 @@
         <connection>scm:git:git@github.com:zhgzhg/drizzle.git</connection>
         <developerConnection>scm:git:git@github.com:zhgzhg/drizzle.git</developerConnection>
         <url>https://github.com/zhgzhg/drizzle</url>
-        <tag>0.4.1</tag>
     </scm>
 
     <groupId>com.github.zhgzhg</groupId>
     <artifactId>drizzle</artifactId>
-    <version>0.5.1-SNAPSHOT</version>
+    <version>0.6.0-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -38,9 +37,14 @@
         <semver4j-version>0.16.4</semver4j-version>
         <gson-version>2.8.6</gson-version>
 
-        <download-maven-plugin-version>1.5.1</download-maven-plugin-version>
+        <junit-jupiter-engine-version>5.6.2</junit-jupiter-engine-version>
+        <junit-jupiter-api-version>5.6.2</junit-jupiter-api-version>
+        <junit-platform-launcher-version>1.6.2</junit-platform-launcher-version>
+        <apiguardian-api-version>1.1.0</apiguardian-api-version>
+
+        <download-maven-plugin-version>1.6.0</download-maven-plugin-version>
         <maven-assembly-plugin-version>3.3.0</maven-assembly-plugin-version>
-        <maven-shade-plugin-version>3.2.3</maven-shade-plugin-version>
+        <maven-shade-plugin-version>3.2.4</maven-shade-plugin-version>
         <maven-release-plugin-version>3.0.0-M1</maven-release-plugin-version>
     </properties>
 
@@ -85,6 +89,31 @@
             <scope>system</scope>
             <systemPath>${project.basedir}/arduino-${arduino-version}/lib/pde.jar</systemPath>
             <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit-jupiter-api-version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit-jupiter-engine-version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <version>${junit-platform-launcher-version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apiguardian</groupId>
+            <artifactId>apiguardian-api</artifactId>
+            <version>${apiguardian-api-version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
