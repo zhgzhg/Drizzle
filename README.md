@@ -23,7 +23,7 @@ How to Use
  * Library Manager or use the "Bulk Resolve Marked Dependencies" command from the Tools menu.
  *
  * @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
- * @Board esp8266::NodeMCU 1.0 (ESP-12E Module)
+ * @Board esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)
  * @BoardSettings esp8266::NodeMCU 1.0 (ESP-12E Module)::Flash Frequency->40MHz||Flash Mode->QIO
  *
  * @DependsOn Arduino_CRC32::1.0.0
@@ -46,7 +46,7 @@ void loop() {
 ```
 Create a comment inside the main file of your Arduino sketch. Preferably at the beginning.
 
-Use markers like "@DependsOn", "@BoardManager", "@BoardSettings", and "@Board" to describe sketch's requirements.
+Use markers like "@DependsOn", "@BoardManager", "@BoardSettings", and "@Board" to describe the sketch's requirements.
 Like that the code self-explains its dependencies, so anyone interested in compiling it can do that with 2 clicks.
 
 Using and combining Drizzle's markers is always optional. 
@@ -117,8 +117,8 @@ Supported Markers
 CLI Extras
 ----------
 
-In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse
-operation, where from JSON file Drizzle markers are produced is also possible.
+Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
+from JSON file Drizzle markers are produced is also possible.
 
 For e.g. `java -jar drizzle-0.6.0.jar --parse hello-world.ino` will produce:
 
