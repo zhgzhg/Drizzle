@@ -1,0 +1,35 @@
+{
+  "board_manager": {
+    "platform": "esp8266",
+    "version": "^2.6.3",
+    "url": "https://arduino.esp8266.com/stable/package_esp8266com_index.json"
+  },
+  "board": {
+    "providerPackage": "esp8266",
+    "platform": "esp8266",
+    "name": "NodeMCU 1.0 (ESP-12E Module)"
+  },
+  "board_settings": [
+    {
+      "board": {
+        "platform": "esp8266",
+        "name": "NodeMCU 1.0 (ESP-12E Module)"
+      },
+      "clickable_options": [
+        [
+          "Flash Frequency",
+          "40MHz"
+        ],
+        [
+          "Flash Mode",
+          "QIO"
+        ]
+      ]
+    }
+  ],
+  "libraries": {
+    "BMP280_DEV": "(>= 1.0.8 && < 1.0.16)",
+    "Arduino_CRC32": "1.0.0",
+    "Arduino Cloud Provider Examples": "*"
+  }
+}
