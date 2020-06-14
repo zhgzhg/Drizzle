@@ -27,9 +27,12 @@ public class DrizzleCLI {
     public static class BoardSettingsSerializerCustomizer implements JsonSerializer<SourceExtractor.BoardSettings>,
             JsonDeserializer<SourceExtractor.BoardSettings> {
 
-        public static final String BOARD = "board";
-        public static final String CLICKABLE_OPTIONS = "clickable_options";
+        public static final String BOARD_INFO_HOLDER = "board";
+        public static final String CLICKABLE_OPTIONS_HOLDER = "clickable_options";
+
+        public static final String NAME = "name";
         public static final String PLATFORM = "platform";
+        public static final String PROVIDER_PACKAGE = "providerPackage";
 
         @Override
         public JsonElement serialize(final SourceExtractor.BoardSettings src, final Type typeOfSrc,
@@ -41,16 +44,17 @@ public class DrizzleCLI {
             if (platform == null || platform.getAsString().isEmpty()) {
                 board.add(PLATFORM, new JsonPrimitive("*"));
             }
-            JsonPrimitive boardName = board.getAsJsonPrimitive(BOARD);
+            JsonPrimitive boardName = board.getAsJsonPrimitive(NAME);
             if (boardName == null || boardName.getAsString().isEmpty()) {
-                board.add(BOARD, new JsonPrimitive("*"));
+                board.add(NAME, new JsonPrimitive("*"));
             }
+            board.remove(PROVIDER_PACKAGE);
 
             JsonElement clickableOptions = context.serialize(src.clickableOptions, List.class);
 
             JsonObject result = new JsonObject();
-            result.add(BOARD, board);
-            result.add(CLICKABLE_OPTIONS, clickableOptions);
+            result.add(BOARD_INFO_HOLDER, board);
+            result.add(CLICKABLE_OPTIONS_HOLDER, clickableOptions);
 
             return result;
         }
@@ -59,9 +63,9 @@ public class DrizzleCLI {
         public SourceExtractor.BoardSettings deserialize(final JsonElement json, final Type typeOfT,
                 final JsonDeserializationContext context) {
 
-            SourceExtractor.Board board = context.deserialize(json.getAsJsonObject().getAsJsonObject(BOARD), SourceExtractor.Board.class);
+            SourceExtractor.Board board = context.deserialize(json.getAsJsonObject().getAsJsonObject(BOARD_INFO_HOLDER), SourceExtractor.Board.class);
             List<List<String>> clickableOptions =
-                    context.deserialize(json.getAsJsonObject().getAsJsonArray(CLICKABLE_OPTIONS), List.class);
+                    context.deserialize(json.getAsJsonObject().getAsJsonArray(CLICKABLE_OPTIONS_HOLDER), List.class);
 
             SourceExtractor.BoardSettings boardSettings = new SourceExtractor.BoardSettings(board);
             boardSettings.clickableOptions.addAll(clickableOptions);
@@ -117,7 +121,7 @@ public class DrizzleCLI {
     public static void main(String[] args) {
         if (args.length > 0 && (args[0].equals("-h") || args[0].equals("--help"))) {
             String implementationVersion = DrizzleCLI.class.getPackage().getImplementationVersion();
-            if (implementationVersion == null)  implementationVersion = "SNAPSHOT";
+            if (implementationVersion == null) implementationVersion = "SNAPSHOT";
 
             System.out.printf("Drizzle %s CLI Helper%n", implementationVersion);
 
@@ -166,7 +170,10 @@ public class DrizzleCLI {
             }
 
             if (projSettings.board != null) {
-                System.out.printf("%s %s::%s%n", SourceExtractor.BOARDNAME_MARKER, projSettings.board.platform, projSettings.board.name);
+                String providerPackage = projSettings.board.providerPackage;
+                if (providerPackage == null || providerPackage.isEmpty()) providerPackage = projSettings.board.platform;
+                System.out.printf("%s %s::%s::%s%n", SourceExtractor.BOARDNAME_MARKER, providerPackage, projSettings.board.platform,
+                        projSettings.board.name);
             }
 
             if (projSettings.boardSettings != null) {

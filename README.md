@@ -7,8 +7,8 @@ A lightweight dependency helper for Arduino IDE.
 Drizzle provides an optional, thin dependency management functionality layer on top of Arduino IDE's existing features, self-contained
 within the sketch file's comments.
 
-By clicking on "Tools / Bulk Resolve Marked Dependencies" it will download the libraries, platform, set the board and specific settings,
-all described into the comments of your sketch file.
+By clicking on "Tools / Bulk Resolve Marked Dependencies" it will download the libraries, platform, set the board, and its specific
+settings, all described into the comments of your sketch file.
 
 ![Build Fat Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Fat%20Jar/badge.svg)
 
@@ -46,7 +46,7 @@ void loop() {
 ```
 Create a comment inside the main file of your Arduino sketch. Preferably at the beginning.
 
-Use markers like "@DependsOn", "@BoardManager", and "@Board" to describe sketch's requirements.
+Use markers like "@DependsOn", "@BoardManager", "@BoardSettings", and "@Board" to describe sketch's requirements.
 Like that the code self-explains its dependencies, so anyone interested in compiling it can do that with 2 clicks.
 
 Using and combining Drizzle's markers is always optional. 
@@ -71,11 +71,12 @@ Supported Markers
     * `@BoardManager esp32::>1.0.3::https://dl.espressif.com/dl/package_esp32_index.json`
 
 
-* __@Board__ _platform_name_::_board_name_
+* __@Board__ [_provider_package_name_::]_platform_name_::_board_name_
   * Selects the name of the target board
   * __Respects the first valid marker that's found. The rest will be ignored.__
+  * __Not specifying provider package name would assume its name's matching the platform name.__
   * Examples:
-    * `@Board Arduino AVR Boards::Arduino Nano`
+    * `@Board arduino::Arduino AVR Boards::Arduino Nano`
     * `@Board esp8266::NodeMCU 1.0 (ESP-12E Module)`
     * `@Board esp32::ESP32 Dev Module`
 
@@ -100,13 +101,13 @@ Supported Markers
     * `@DependsOn Github's BMP280_DEV::https://github.com/MartinL1/BMP280_DEV/archive/master.zip`
 
 * __@BoardSettings__ _platform_name_::_board_name_::_menu_path_[->_option_][||_another_menu_path_->option]
-  * Clicks on the UI options provided by particular board (and platform)
+  * Clicks on the UI options provided by a particular board (and platform)
   * __More__ than 1 marker can be used.
   * To match all platform and/or board names a * can be used
   * To describe the path to the particular option -> can be used
   * To separate multiple menu paths || can be used
   * Menu matching is case-sensitive
-  * Menu matching will be performed in the order of definition and __will stop immediately once match is found__. Always define the
+  * Menu matching will be performed in the order of definition and __will stop immediately once a match is found__. Always define the
     concrete rules in the beginning, and the less concrete at the end.  
   * Examples:
     * `@BoardSettings esp32::ESP32 Dev Module::Flash Frequency->40MHz`
@@ -119,54 +120,55 @@ CLI Extras
 In addition, Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse
 operation, where from JSON file Drizzle markers are produced is also possible.
 
-For e.g. `java -jar drizzle-0.5.0.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.6.0.jar --parse hello-world.ino` will produce:
 
 ```
 {
-    "board_manager": {
-        "platform": "esp8266",
-        "version": "^2.6.3",
-        "url": "https://arduino.esp8266.com/stable/package_esp8266com_index.json"
-    },
-    "board": {
+  "board_manager": {
+    "platform": "esp8266",
+    "version": "^2.6.3",
+    "url": "https://arduino.esp8266.com/stable/package_esp8266com_index.json"
+  },
+  "board": {
+    "providerPackage": "esp8266",
+    "platform": "esp8266",
+    "name": "NodeMCU 1.0 (ESP-12E Module)"
+  },
+  "board_settings": [
+    {
+      "board": {
         "platform": "esp8266",
         "name": "NodeMCU 1.0 (ESP-12E Module)"
-    },
-    "board_settings": [
-      {
-        "board": {
-          "platform": "esp8266",
-          "board": "NodeMCU 1.0 (ESP-12E Module)"
-        },
-        "clickable_options": [
-          [
-            "Flash Frequency",
-            "40MHz"
-          ],
-          [
-            "Flash Mode",
-            "QIO"
-          ]
+      },
+      "clickable_options": [
+        [
+          "Flash Frequency",
+          "40MHz"
+        ],
+        [
+          "Flash Mode",
+          "QIO"
         ]
-      }
-    ],
-    "libraries": {
-        "BMP280_DEV": "(>= 1.0.8 && < 1.0.16)",
-        "Arduino_CRC32": "1.0.0",
-        "Arduino Cloud Provider Examples": "*"
+      ]
     }
+  ],
+  "libraries": {
+    "BMP280_DEV": "(>= 1.0.8 && < 1.0.16)",
+    "Arduino_CRC32": "1.0.0",
+    "Arduino Cloud Provider Examples": "*"
+  }
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.5.0.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.6.0.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
-@Board esp8266::NodeMCU 1.0 (ESP-12E Module)
+@Board esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)
 @BoardSettings esp8266::NodeMCU 1.0 (ESP-12E Module)::Flash Frequency->40MHz||Flash Mode->QIO
+@DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
-@DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
 ```
 
 

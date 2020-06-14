@@ -26,6 +26,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -39,6 +40,7 @@ public class SourceExtractor {
     public static final String BOARDSETTINGS_MARKER = "@BoardSettings";
 
 
+    public static final String PACKAGE_PROVIDER_GROUP = "package";
     public static final String PLATFORM_GROUP = "platform";
     public static final String LIB_GROUP = "lib";
     public static final String VER_GROUP = "ver";
@@ -52,8 +54,8 @@ public class SourceExtractor {
     public static final Pattern BOARD_MANAGER = Pattern.compile("^[^@]*"
             + BOARDMANAGER_MARKER + "\\s+(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + VER_GROUP + ">[^:]+)(::(?<" + URL_GROUP + ">.*))?$");
 
-    public static final Pattern BOARD =
-            Pattern.compile("^[^@]*" + BOARDNAME_MARKER + "\\s+(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">.+)$");
+    public static final Pattern BOARD = Pattern.compile("^[^@]*" + BOARDNAME_MARKER + "\\s+((?<" + PACKAGE_PROVIDER_GROUP + ">[^:]+)::)?"
+                    + "(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">.+)$");
 
     public static final Pattern BOARD_SETTINGS = Pattern.compile("^[^@]*"
             + BOARDSETTINGS_MARKER + "\\s+(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">[^:]+)::(?<" + MENU_GROUP + ">.+)$");
@@ -81,17 +83,19 @@ public class SourceExtractor {
     }
 
     public static class Board {
+        public final String providerPackage;
         public final String platform;
         public final String name;
 
-        public Board(final String platform, final String name) {
+        public Board(final String providerPackage, final String platform, final String name) {
+            this.providerPackage = providerPackage;
             this.platform = platform;
             this.name = name;
         }
 
         @Override
         public String toString() {
-            return "Board{" + "platform='" + platform + '\'' + ", name='" + name + '\'' + '}';
+            return "Board{providerPackage=\'" + providerPackage + "\', platform='" + platform + '\'' + ", name='" + name + '\'' + '}';
         }
     }
 
@@ -102,6 +106,7 @@ public class SourceExtractor {
         public BoardSettings(final Board board) {
             Objects.requireNonNull(board);
             this.board = new Board(
+                    board.providerPackage,
                     (board.platform == null || board.platform.isEmpty() || "*".equals(board.platform) ? null : board.platform),
                     (board.name == null || board.name.isEmpty() || "*".equals(board.name) ? null : board.name)
             );
@@ -126,7 +131,8 @@ public class SourceExtractor {
 
         @Override
         public String toString() {
-            return "BoardSettings{" + "board=" + board + ", clickableOptions=" + clickableOptions + '}';
+            return "BoardSettings{" + "board=" + board.toString().replaceFirst("providerPackage='[^']*', ", "")
+                    + ", clickableOptions=" + clickableOptions + '}';
         }
     }
 
@@ -149,18 +155,27 @@ public class SourceExtractor {
     public Board dependentBoardFromMainSketchSource(String source) {
 
         try {
-            Map<String, String> boardPlatformAndName = extractMarkersKeyValue(
-                    extractAllCommentsFromSource(source), BOARD, BOARDNAME_MARKER, PLATFORM_GROUP, BOARD_GROUP);
+            Map<String, Map<String, String>> boardPlatformAndNames = extractMarkersKeyAndParams(extractAllCommentsFromSource(source), BOARD,
+                    BOARDNAME_MARKER, PACKAGE_PROVIDER_GROUP, Arrays.asList(PLATFORM_GROUP, BOARD_GROUP),
+                    parsedParams -> parsedParams.get(PLATFORM_GROUP)
+            );
 
             Board result = null;
-            for (Iterator<Map.Entry<String, String>> it = boardPlatformAndName.entrySet().iterator(); it.hasNext(); ) {
-                Map.Entry<String, String> boardCandidate = it.next();
 
-                if (result == null && boardCandidate.getValue() != null && !boardCandidate.getValue().isEmpty()) {
-                    result = new Board(boardCandidate.getKey(), boardCandidate.getValue());
+            for (Iterator<Map.Entry<String, Map<String, String>>> iter = boardPlatformAndNames.entrySet().iterator(); iter.hasNext(); ) {
+                Map.Entry<String, Map<String, String>> next = iter.next();
+                String providerPackage = next.getKey();
+                Map<String, String> boardCandidate = next.getValue();
+                String platformName = boardCandidate.get(PLATFORM_GROUP);
+                String boardName = boardCandidate.get(BOARD_GROUP);
+
+
+                if (result == null && platformName != null && !platformName.isEmpty() && boardName != null
+                        && !boardName.isEmpty()) {
+                    result = new Board(providerPackage, platformName, boardName);
                 } else {
-                    this.logProxy.cliError("Ignoring additional %s %s::%s%n", BOARDNAME_MARKER, boardCandidate.getKey(),
-                            boardCandidate.getValue());
+                    this.logProxy.cliError("Ignoring additional %s %s::%s::%s%n", BOARDNAME_MARKER, providerPackage,
+                            platformName, boardName);
                 }
             }
 
@@ -182,7 +197,7 @@ public class SourceExtractor {
             List<BoardSettings> result = new ArrayList<>(boardAndClickableSettings.size());
             boardAndClickableSettings.forEach((platformName, boardStuff) -> {
                 String boardName = boardStuff.get(BOARD_GROUP);
-                Board board = new Board(!platformName.equals("*") ? platformName : null, !"*".equals(boardName) ? boardName : null);
+                Board board = new Board(null, !platformName.equals("*") ? platformName : null, !"*".equals(boardName) ? boardName : null);
                 BoardSettings boardSettings = new BoardSettings(board);
 
                 String menus = boardStuff.get(MENU_GROUP);
@@ -265,8 +280,13 @@ public class SourceExtractor {
         return Collections.emptyMap();
     }
 
-    private Map<String, Map<String, String>> extractMarkersKeyAndParams(
-            List<String> comments, Pattern marker, String markerName, String keyGroup, List<String> paramGroups) {
+    private Map<String, Map<String, String>> extractMarkersKeyAndParams(List<String> comments, Pattern marker, String markerName,
+            String keyGroup, List<String> paramGroups) {
+        return this.extractMarkersKeyAndParams(comments, marker, markerName, keyGroup, paramGroups, (data) -> null);
+    }
+
+    private Map<String, Map<String, String>> extractMarkersKeyAndParams(List<String> comments, Pattern marker, String markerName,
+            String keyGroup, List<String> paramGroups, Function<Map<String, String>, String> onNullKey) {
 
         if (comments == null || comments.isEmpty()) return Collections.emptyMap();
 
@@ -281,6 +301,9 @@ public class SourceExtractor {
                                 Map<String, String> params = new LinkedHashMap<>();
                                 if (paramGroups != null) {
                                     paramGroups.forEach(pg -> params.put(pg, matcher.group(pg)));
+                                }
+                                if (key == null) {
+                                    key = onNullKey.apply(params);
                                 }
                                 result.put(key, params);
                             } else if (comment.matches("^[^@]*" + markerName + "(?:\\s|$)")) {

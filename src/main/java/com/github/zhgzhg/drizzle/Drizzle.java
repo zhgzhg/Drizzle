@@ -40,8 +40,10 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
@@ -144,9 +146,17 @@ public class Drizzle implements Tool {
                         .stream()
                         .anyMatch(contributedPlatform -> board.platform.equals(contributedPlatform.getName()))
                 )
-                .flatMap(contributedPackage -> BaseNoGui.getTargetPackage(contributedPackage.getName()).platforms().stream())
-                .flatMap(targetPlatform -> targetPlatform.getBoards().entrySet().stream())
-                .filter(idTargetBoardEntry -> board.name.equals(idTargetBoardEntry.getValue().getName()))
+                .flatMap(contributedPackage -> {
+                    TargetPackage targetPackage = BaseNoGui.getTargetPackage(contributedPackage.getName());
+                    if (targetPackage != null) {
+                        return targetPackage.platforms().stream();
+                    }
+                    return Stream.empty();
+                })
+                .flatMap(targetPlatform ->
+                        targetPlatform.getBoards().entrySet().stream())
+                .filter(idTargetBoardEntry ->
+                        board.name.equals(idTargetBoardEntry.getValue().getName()))
                 .map(Map.Entry::getValue)
                 .findFirst()
                 .orElse(null);
