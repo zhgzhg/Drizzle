@@ -144,7 +144,7 @@ public class Drizzle implements Tool {
                 .stream()
                 .filter(contributedPackage -> contributedPackage.getPlatforms()
                         .stream()
-                        .anyMatch(contributedPlatform -> board.platform.equals(contributedPlatform.getName()))
+                        .anyMatch(contributedPlatform -> board.providerPackage.equals(contributedPlatform.getName()))
                 )
                 .flatMap(contributedPackage -> {
                     TargetPackage targetPackage = BaseNoGui.getTargetPackage(contributedPackage.getName());
@@ -209,7 +209,11 @@ public class Drizzle implements Tool {
 
         String boardUrlsCsv = PreferencesData.get(cc.arduino.Constants.PREF_BOARDS_MANAGER_ADDITIONAL_URLS, "");
         if (bmSettings.url != null && !boardUrlsCsv.toLowerCase().contains(bmSettings.url)) {
-            PreferencesData.set(cc.arduino.Constants.PREF_BOARDS_MANAGER_ADDITIONAL_URLS, boardUrlsCsv.concat(",").concat(bmSettings.url));
+            if (!boardUrlsCsv.trim().isEmpty()) {
+                boardUrlsCsv += ",";
+            }
+            boardUrlsCsv += bmSettings.url;
+            PreferencesData.set(cc.arduino.Constants.PREF_BOARDS_MANAGER_ADDITIONAL_URLS, boardUrlsCsv);
         }
 
         this.logProxy.cliInfo("Updating platform definitions list...");
