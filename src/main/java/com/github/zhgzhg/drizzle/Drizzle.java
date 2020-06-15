@@ -40,10 +40,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
@@ -140,26 +138,28 @@ public class Drizzle implements Tool {
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         if (board == null) return 0;
 
-        TargetBoard targetBoard = BaseNoGui.indexer.getPackages()
-                .stream()
-                .filter(contributedPackage -> contributedPackage.getPlatforms()
-                        .stream()
-                        .anyMatch(contributedPlatform -> board.providerPackage.equals(contributedPlatform.getName()))
+        TargetBoard targetBoard = BaseNoGui.indexer.getIndex().getInstalledPlatforms().stream()
+                .filter(contributedPlatform -> board.providerPackage.equals(contributedPlatform.getParentPackage().getName())
+                        && board.platform.equals(contributedPlatform.getName())
+                        && contributedPlatform.getBoards().stream().anyMatch(contribBoard -> board.name.equals(contribBoard.getName()))
                 )
-                .flatMap(contributedPackage -> {
-                    TargetPackage targetPackage = BaseNoGui.getTargetPackage(contributedPackage.getName());
-                    if (targetPackage != null) {
-                        return targetPackage.platforms().stream();
-                    }
-                    return Stream.empty();
-                })
-                .flatMap(targetPlatform ->
-                        targetPlatform.getBoards().entrySet().stream())
-                .filter(idTargetBoardEntry ->
-                        board.name.equals(idTargetBoardEntry.getValue().getName()))
-                .map(Map.Entry::getValue)
+                .map(contribPlatf -> BaseNoGui.getTargetPlatform(contribPlatf.getParentPackage().getName(), contribPlatf.getArchitecture()))
+                .flatMap(targetPlatform -> targetPlatform.getBoards().values().stream())
+                .filter(targtBrd -> board.name.equals(targtBrd.getName()))
                 .findFirst()
                 .orElse(null);
+
+        if (targetBoard == null) {
+            // search in the local hardware folder for suitable projects
+            TargetPackage targetPackage = BaseNoGui.packages.get(board.providerPackage);
+            if (targetPackage != null) {
+                TargetPlatform targetPlatform = targetPackage.getPlatforms().get(board.platform);
+                targetBoard = targetPlatform.getBoards().values().stream()
+                        .filter(targtBrd -> board.name.equals(targtBrd.getName()))
+                        .findFirst()
+                        .orElse(null);
+            }
+        }
 
         if (targetBoard == null) {
             this.logProxy.cliErrorln("Failed to pick board based on " + board);
