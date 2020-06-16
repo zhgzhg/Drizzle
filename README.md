@@ -75,7 +75,7 @@ Supported Markers
 * __@Board__ [_provider_package_name_::]_platform_name_::_board_name_
   * Selects the name of the target board
   * __Respects the first valid marker that's found. The rest will be ignored.__
-  * __Not specifying provider package name would assume its name's matching the platform name.__
+  * __Not specifying provider package name would make Drizzle to attempt resolving it automatically.__
   * Examples:
     * `@Board arduino::Arduino AVR Boards::Arduino Nano`
     * `@Board esp8266::NodeMCU 1.0 (ESP-12E Module)`

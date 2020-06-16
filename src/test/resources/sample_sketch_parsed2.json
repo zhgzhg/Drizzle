@@ -5,7 +5,7 @@
     "url": "https://arduino.esp8266.com/stable/package_esp8266com_index.json"
   },
   "board": {
-    "providerPackage": null,
+    "providerPackage": "esp8266",
     "platform": "esp8266",
     "name": "NodeMCU 1.0 (ESP-12E Module)"
   },

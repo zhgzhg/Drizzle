@@ -40,6 +40,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -69,6 +70,9 @@ public class Drizzle implements Tool {
 
             @Override
             public void uiError(final Throwable t) { Base.showError("Error", t.getMessage(), t); }
+
+            @Override
+            public void uiWarn(final String format, final Object... params) { editor.statusNotice(String.format(format, params)); }
 
             @Override
             public void uiInfo(final String format, final Object... params) { editor.statusNotice(String.format(format, params)); }
@@ -108,7 +112,7 @@ public class Drizzle implements Tool {
                 String err = "Couldn't install some/any libraries - managed by marker " + SourceExtractor.DEPENDSON_MARKER
                         + " in the main sketch!";
                 this.logProxy.cliErrorln(err);
-                this.logProxy.uiInfo(err);
+                this.logProxy.uiWarn(err);
             }
 
             if (selectBoard() == 0) {
@@ -139,7 +143,8 @@ public class Drizzle implements Tool {
         if (board == null) return 0;
 
         TargetBoard targetBoard = BaseNoGui.indexer.getIndex().getInstalledPlatforms().stream()
-                .filter(contributedPlatform -> board.providerPackage.equals(contributedPlatform.getParentPackage().getName())
+                .filter(contributedPlatform ->
+                        (board.providerPackage == null || board.providerPackage.equals(contributedPlatform.getParentPackage().getName()))
                         && board.platform.equals(contributedPlatform.getName())
                         && contributedPlatform.getBoards().stream().anyMatch(contribBoard -> board.name.equals(contribBoard.getName()))
                 )
@@ -151,14 +156,19 @@ public class Drizzle implements Tool {
 
         if (targetBoard == null) {
             // search in the local hardware folder for suitable projects
-            TargetPackage targetPackage = BaseNoGui.packages.get(board.providerPackage);
-            if (targetPackage != null) {
-                TargetPlatform targetPlatform = targetPackage.getPlatforms().get(board.platform);
-                targetBoard = targetPlatform.getBoards().values().stream()
-                        .filter(targtBrd -> board.name.equals(targtBrd.getName()))
-                        .findFirst()
-                        .orElse(null);
-            }
+
+            targetBoard = BaseNoGui.packages.values().stream()
+                    .filter(p ->
+                            board.providerPackage == null || board.providerPackage.equals(p.getId()))
+                    .map(targPkg ->
+                            targPkg.getPlatforms().get(board.platform))
+                    .filter(Objects::nonNull)
+                    .flatMap(targPlatf ->
+                            targPlatf.getBoards().values().stream())
+                    .filter(targtBrd ->
+                            board.name.equals(targtBrd.getName()))
+                    .findFirst()
+                    .orElse(null);
         }
 
         if (targetBoard == null) {

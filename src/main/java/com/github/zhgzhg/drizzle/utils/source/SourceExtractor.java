@@ -157,7 +157,7 @@ public class SourceExtractor {
         try {
             Map<String, Map<String, String>> boardPlatformAndNames = extractMarkersKeyAndParams(extractAllCommentsFromSource(source), BOARD,
                     BOARDNAME_MARKER, PACKAGE_PROVIDER_GROUP, Arrays.asList(PLATFORM_GROUP, BOARD_GROUP),
-                    parsedParams -> parsedParams.get(PLATFORM_GROUP)
+                    parsedParams -> null
             );
 
             Board result = null;
@@ -181,7 +181,7 @@ public class SourceExtractor {
 
             return result;
         } catch (IOException e) {
-            e.printStackTrace(this.logProxy.stderr());
+            this.logProxy.cliErrorln(e);
         }
 
         return null;
@@ -220,7 +220,7 @@ public class SourceExtractor {
 
             return result;
         } catch (IOException e) {
-            e.printStackTrace(this.logProxy.stderr());
+            this.logProxy.cliErrorln(e);
         }
 
         return Collections.emptyList();
@@ -305,9 +305,13 @@ public class SourceExtractor {
                                 if (key == null) {
                                     key = onNullKey.apply(params);
                                 }
-                                result.put(key, params);
+                                if (!result.containsKey(key)) {
+                                    result.put(key, params);
+                                } else {
+                                    this.logProxy.uiWarn("Ignoring duplicated marker comment:\n" + comment);
+                                }
                             } else if (comment.matches("^[^@]*" + markerName + "(?:\\s|$)")) {
-                                this.logProxy.uiInfo("Ignoring duplicated or invalid marker comment:\n" + comment);
+                                this.logProxy.uiWarn("Ignoring invalid marker comment:\n" + comment);
                             }
                         },
                         LinkedHashMap::putAll

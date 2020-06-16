@@ -11,6 +11,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -21,27 +22,30 @@ import static org.junit.jupiter.api.Assertions.fail;
 public class DrizzleParsingTest {
     private LogProxy strictLogProxy = new LogProxy() {
         @Override
-        public void cliError(final String format, final Object... params) {
-            super.cliError(format, params);
+        public PrintStream stderr() {
             fail("CLI Error printed");
+            return super.stderr();
         }
 
         @Override
-        public void cliErrorln() {
-            super.cliErrorln();
-            fail("CLI Error printed");
+        public PrintStream stdwarn() {
+            fail("CLI Warning printed");
+            return super.stdwarn();
         }
 
         @Override
-        public void cliErrorln(final String msg) {
-            super.cliErrorln(msg);
-            fail("CLI Error printed");
+        public void uiError(final String format, final Object... params) {
+            fail("UI Error printed");
         }
 
         @Override
-        public void cliErrorln(final Throwable t) {
-            super.cliErrorln(t);
-            fail("CLI Error printed");
+        public void uiError(final Throwable t) {
+            fail("UI Error printed");
+        }
+
+        @Override
+        public void uiWarn(final String format, final Object... params) {
+            fail("UI Warning printed");
         }
     };
 
@@ -80,27 +84,34 @@ public class DrizzleParsingTest {
         DrizzleCLI.ProjectSettings projectSettings = createProjectSettings(sourceExtractor, source);
         DrizzleCLI.ProjectSettings projectSettings2 = createProjectSettings(sourceExtractor, source2);
 
-        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting()
+        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().serializeNulls()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new DrizzleCLI.BoardSettingsSerializerCustomizer())
                 .create();
 
-        String templateJson = loadWholeTextResource("sample_sketch_parsed.json");
-
-        assertEquals(templateJson, gson.toJson(projectSettings));
-        assertEquals(templateJson, gson.toJson(projectSettings2));
+        assertEquals(loadWholeTextResource("sample_sketch_parsed.json"), gson.toJson(projectSettings));
+        assertEquals(loadWholeTextResource("sample_sketch_parsed2.json"), gson.toJson(projectSettings2));
     }
 
     @Test
     public void jsonParserTest() throws IOException {
-        String json = loadWholeTextResource("sample_sketch_parsed.json");
-
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new DrizzleCLI.BoardSettingsSerializerCustomizer())
                 .create();
 
+        String json = loadWholeTextResource("sample_sketch_parsed.json");
         DrizzleCLI.ProjectSettings projSettings = gson.fromJson(json, DrizzleCLI.ProjectSettings.class);
         DrizzleCLI.ProjectSettings projSettingsTemplate = createProjectSettings(
                 new SourceExtractor(this.strictLogProxy), loadWholeTextResource("sample_sketch.ino"));
+
+        assertEquals(projSettingsTemplate.getBoardManager().toString(), projSettings.getBoardManager().toString());
+        assertEquals(projSettingsTemplate.getBoard().toString(), projSettings.getBoard().toString());
+        assertEquals(projSettingsTemplate.getBoardSettings().toString(), projSettings.getBoardSettings().toString());
+        assertEquals(projSettingsTemplate.getLibraries().toString(), projSettings.getLibraries().toString());
+
+        json = loadWholeTextResource("sample_sketch_parsed2.json");
+        projSettings = gson.fromJson(json, DrizzleCLI.ProjectSettings.class);
+        projSettingsTemplate = createProjectSettings(
+                new SourceExtractor(this.strictLogProxy), loadWholeTextResource("sample_sketch2.ino"));
 
         assertEquals(projSettingsTemplate.getBoardManager().toString(), projSettings.getBoardManager().toString());
         assertEquals(projSettingsTemplate.getBoard().toString(), projSettings.getBoard().toString());

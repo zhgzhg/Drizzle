@@ -17,6 +17,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.util.List;
@@ -63,7 +64,9 @@ public class DrizzleCLI {
         public SourceExtractor.BoardSettings deserialize(final JsonElement json, final Type typeOfT,
                 final JsonDeserializationContext context) {
 
-            SourceExtractor.Board board = context.deserialize(json.getAsJsonObject().getAsJsonObject(BOARD_INFO_HOLDER), SourceExtractor.Board.class);
+            SourceExtractor.Board board = context.deserialize(
+                    json.getAsJsonObject().getAsJsonObject(BOARD_INFO_HOLDER), SourceExtractor.Board.class);
+
             List<List<String>> clickableOptions =
                     context.deserialize(json.getAsJsonObject().getAsJsonArray(CLICKABLE_OPTIONS_HOLDER), List.class);
 
@@ -170,10 +173,14 @@ public class DrizzleCLI {
             }
 
             if (projSettings.board != null) {
+                System.out.printf("%s ", SourceExtractor.BOARDNAME_MARKER);
+
                 String providerPackage = projSettings.board.providerPackage;
-                if (providerPackage == null || providerPackage.isEmpty()) providerPackage = projSettings.board.platform;
-                System.out.printf("%s %s::%s::%s%n", SourceExtractor.BOARDNAME_MARKER, providerPackage, projSettings.board.platform,
-                        projSettings.board.name);
+                if (providerPackage != null && !providerPackage.isEmpty()) {
+                    System.out.printf("%s::", providerPackage);
+                }
+
+                System.out.printf("%s::%s%n", projSettings.board.platform, projSettings.board.name);
             }
 
             if (projSettings.boardSettings != null) {
@@ -217,23 +224,15 @@ public class DrizzleCLI {
 
         SourceExtractor sourceExtractor = new SourceExtractor(new LogProxy() {
             @Override
-            public void cliError(final String format, final Object... params) {
+            public PrintStream stderr() {
                 // silence it to not polute the CLI output. the exit codes will be still available
+                return stdnull();
             }
 
             @Override
-            public void cliErrorln() {
+            public PrintStream stdwarn() {
                 // silence it to not polute the CLI output. the exit codes will be still available
-            }
-
-            @Override
-            public void cliErrorln(final String msg) {
-                // silence it to not polute the CLI output. the exit codes will be still available
-            }
-
-            @Override
-            public void cliErrorln(final Throwable t) {
-                // silence it to not polute the CLI output. the exit codes will be still available
+                return stdnull();
             }
         });
 
@@ -256,7 +255,7 @@ public class DrizzleCLI {
         projectSettings.setBoardSettings(boardSettings);
         projectSettings.setLibraries(libraries);
 
-        Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting()
+        Gson gson = new GsonBuilder().disableHtmlEscaping().serializeNulls().setPrettyPrinting()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
                 .create();
         System.out.println(gson.toJson(projectSettings));
