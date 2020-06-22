@@ -140,7 +140,7 @@ public class SourceExtractor {
         this.logProxy = logProxy;
     }
 
-    public static String loadSourceFromPrimarSketch(Editor editor) throws IOException {
+    public static String loadSourceFromPrimarySketch(Editor editor) throws IOException {
         if (editor != null) {
             SketchFile primaryFile = editor.getSketch().getPrimaryFile();
             if (primaryFile != null) {

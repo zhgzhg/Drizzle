@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class UILocator {
@@ -60,7 +61,9 @@ public class UILocator {
     }
 
     public List<JMenu> customMenusForCurrentlySelectedBoard() {
-        return Base.INSTANCE.getBoardsCustomMenus();
+        return Base.INSTANCE.getBoardsCustomMenus().stream()
+                .filter(jm -> jm.isEnabled() && jm.isVisible())
+                .collect(Collectors.toList());
     }
 
     public Optional<JMenu> sketchIncludeLibraryMenu() {
@@ -81,14 +84,14 @@ public class UILocator {
     }
 
     public JMenuItem walkTowardsMenuItem(
-            List<JMenu> menus, List<String> parents, BiPredicate<String, String> parentTitleMatcher, Predicate<String> goalMatcher) {
+            List<JMenu> menus, List<String> parents, BiPredicate<String, JMenu> parentTitleMatcher, Predicate<JMenuItem> goalMatcher) {
 
         if (!parents.isEmpty()) {
             JMenu menuContainer = null;
 
             for (String parent : parents) {
                 menuContainer = menus.stream()
-                        .filter(menu -> parentTitleMatcher.test(parent, menu.getText()))
+                        .filter(menu -> parentTitleMatcher.test(parent, menu))
                         .findFirst()
                         .orElse(null);
                 if (menuContainer == null) {
@@ -101,14 +104,14 @@ public class UILocator {
             }
 
             return Stream.of(menuContainer.getMenuComponents())
-                    .filter(c -> c instanceof JMenuItem && goalMatcher.test(((JMenuItem) c).getText()))
+                    .filter(c -> c instanceof JMenuItem && goalMatcher.test((JMenuItem) c))
                     .map(c -> (JMenuItem) c)
                     .findFirst()
                     .orElse(null);
         }
 
         return menus.stream()
-                .filter(m -> m instanceof JMenuItem && goalMatcher.test(m.getText()))
+                .filter(m -> m instanceof JMenuItem && goalMatcher.test(m))
                 .map(m -> (JMenuItem) m)
                 .findFirst()
                 .orElse(null);

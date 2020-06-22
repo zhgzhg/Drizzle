@@ -132,7 +132,7 @@ public class Drizzle implements Tool {
     private int selectBoard() {
         String source;
         try {
-            source = SourceExtractor.loadSourceFromPrimarSketch(editor);
+            source = SourceExtractor.loadSourceFromPrimarySketch(editor);
         } catch (IOException e) {
             this.logProxy.cliErrorln(e);
             this.logProxy.uiError(e.getMessage());
@@ -207,7 +207,7 @@ public class Drizzle implements Tool {
     private int installBoards() {
         String source;
         try {
-            source = SourceExtractor.loadSourceFromPrimarSketch(editor);
+            source = SourceExtractor.loadSourceFromPrimarySketch(editor);
         } catch (IOException e) {
             this.logProxy.cliErrorln(e);
             this.logProxy.uiError(e.getMessage());
@@ -338,7 +338,7 @@ public class Drizzle implements Tool {
     private int installLibraries() {
         String source;
         try {
-             source = SourceExtractor.loadSourceFromPrimarSketch(editor);
+             source = SourceExtractor.loadSourceFromPrimarySketch(editor);
         } catch (IOException e) {
             this.logProxy.cliErrorln(e);
             this.logProxy.uiError(e.getMessage());
@@ -491,7 +491,7 @@ public class Drizzle implements Tool {
     private int selectBoardOptions() {
         String source;
         try {
-            source = SourceExtractor.loadSourceFromPrimarSketch(editor);
+            source = SourceExtractor.loadSourceFromPrimarySketch(editor);
         } catch (IOException e) {
             this.logProxy.cliErrorln(e);
             this.logProxy.uiError(e.getMessage());
@@ -519,16 +519,28 @@ public class Drizzle implements Tool {
                 List<String> parents = (menuPath.size() > 1 ? menuPath.subList(0, menuPath.size() - 1) : Collections.emptyList());
                 String menuItem = (!parents.isEmpty() ? menuPath.get(menuPath.size() - 1) : menuPath.get(0));
 
-                JMenuItem me = this.uiLocator.walkTowardsMenuItem(jMenus, parents,
-                        (targetMenuName, currMenuName) -> {
-                            if (currMenuName != null) {
-                                currMenuName = currMenuName.split(":", 2)[0];
-                                return targetMenuName.equals(currMenuName);
-                            }
+                JMenuItem me = this.uiLocator.walkTowardsMenuItem(jMenus, parents, (targetMenuName, currMenu) -> {
+                       if (!currMenu.isEnabled() && !currMenu.isVisible()) {
+                           return false;
+                       }
 
-                            return false;
-                        },
-                        menuItem::equals
+                        if (targetPlatformName != null) {
+                            Object platform = currMenu.getClientProperty("platform");
+                            if (platform != null && !platform.toString().startsWith(targetPlatformName + "_")) {
+                                return false;
+                            }
+                        }
+
+                        String currMenuName = currMenu.getText();
+                        if (currMenuName != null) {
+                            currMenuName = currMenuName.split(":", 2)[0];
+                            return targetMenuName.equals(currMenuName);
+                        }
+
+                        return false;
+                    },
+                        candidateMenuItem -> candidateMenuItem.isVisible() && candidateMenuItem.isEnabled()
+                                && menuItem.equals(candidateMenuItem.getText())
                 );
 
                 if (me != null) {
