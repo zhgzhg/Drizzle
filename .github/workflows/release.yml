@@ -63,7 +63,7 @@ jobs:
 
             ${{ steps.Changelog.outputs.changelog }}
           draft: false
-          prerelease: true
+          prerelease: false
 
       - name: Add archive asset to the release
         id: upload-release-asset
