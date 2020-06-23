@@ -1,5 +1,7 @@
 package com.github.zhgzhg.drizzle.utils.log;
 
+import processing.app.EditorConsole;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
@@ -8,11 +10,27 @@ public class LogProxy {
     private static final PrintStream dummyPrintStream = new PrintStream(
             new OutputStream() { @Override public void write(final int b) throws IOException { }}) { };
 
-    public PrintStream stderr() { return System.err; }
+    private EditorConsole editorConsole;
 
-    public PrintStream stdout() { return System.out; }
+    public void setEditorConsole(final EditorConsole editorConsole) {
+        this.editorConsole = editorConsole;
+    }
 
-    public PrintStream stdwarn() { return System.out; }
+    public EditorConsole getEditorConsole() {
+        return editorConsole;
+    }
+
+    protected void beforeStdReturn() {
+        if (this.editorConsole != null) {
+            EditorConsole.setCurrentEditorConsole(this.editorConsole);
+        }
+    }
+
+    public PrintStream stderr() { beforeStdReturn(); return System.err; }
+
+    public PrintStream stdout() { beforeStdReturn(); return System.out; }
+
+    public PrintStream stdwarn() { beforeStdReturn(); return System.out; }
 
     public PrintStream stdnull() { return dummyPrintStream; }
 

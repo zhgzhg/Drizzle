@@ -17,7 +17,6 @@ import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
 import processing.app.Base;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
-import processing.app.EditorConsole;
 import processing.app.PreferencesData;
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
@@ -93,7 +92,10 @@ public class Drizzle implements Tool {
 
     @Override
     public void run() {
-        uiLocator.editorConsole().ifPresent(EditorConsole::clear);
+        this.uiLocator.editorConsole().ifPresent(editorConsole -> {
+            editorConsole.clear();
+            this.logProxy.setEditorConsole(editorConsole);
+        });
 
         this.logProxy.uiInfo("                                                                                                                                                                                                               ");
 
@@ -441,8 +443,9 @@ public class Drizzle implements Tool {
                     FileChannel fileOutputChannel = new FileOutputStream(tempFile).getChannel()) {
 
                 long bytesTransferred = fileOutputChannel.transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
-                if (bytesTransferred < 1)
+                if (bytesTransferred < 1) {
                     throw new IOException("File of 0 bytes size");
+                }
 
                 ExternLibFileInstaller installer = new ExternLibFileInstaller(this.logProxy);
                 if (installer.installZipOrDirWithZips(tempFile)) {
@@ -452,7 +455,6 @@ public class Drizzle implements Tool {
             } catch (IOException e) {
                 this.logProxy.cliError("Failed transferring %s:%n", libUri);
                 this.logProxy.cliErrorln(e);
-
             }
 
             delayedFileRemoval(2000, tempFile);
