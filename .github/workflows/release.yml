@@ -40,11 +40,11 @@ jobs:
       - name: Prepare for Changelog Generation
         run: |
           echo -n '{"name": "Drizzle", "version":"' >package.json
-          echo -n -e "${{ github.ref }}" >>package.json
+          echo -n ${{ steps.vars.outputs.tag }} >>package.json
           echo '"}' >>package.json
 
       - name: Generate Changelog
-        uses: scottbrenner/generate-changelog-action@master
+        uses: scottbrenner/generate-changelog-action@1.0.0
           id: Changelog
           env:
             REPO: ${{ github.repository }}
