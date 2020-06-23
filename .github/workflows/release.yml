@@ -45,9 +45,9 @@ jobs:
 
       - name: Generate Changelog
         uses: scottbrenner/generate-changelog-action@1.0.0
-          id: Changelog
-          env:
-            REPO: ${{ github.repository }}
+        id: Changelog
+        env:
+          REPO: ${{ github.repository }}
 
       - name: Create Release
         id: create_release
