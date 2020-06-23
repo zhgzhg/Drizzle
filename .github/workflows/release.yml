@@ -37,6 +37,18 @@ jobs:
           zip -9r drizzle.zip ./Drizzle
           rm -fr ./Drizzle
 
+      - name: Prepare for Changelog Generation
+        run: |
+          echo -n '{"name": "Drizzle", "version":"' >package.json
+          echo -n -e "${{ github.ref }}" >>package.json
+          echo '"}' >>package.json
+
+      - name: Generate Changelog
+        uses: scottbrenner/generate-changelog-action@master
+          id: Changelog
+          env:
+            REPO: ${{ github.repository }}
+
       - name: Create Release
         id: create_release
         uses: actions/create-release@latest
@@ -48,8 +60,10 @@ jobs:
           body: |
             To install Drizzle ${{ steps.vars.outputs.tag }} unzip it inside Arduino IDE's installation directory / tools
             If you have a previous version already installed remove it from the tools directory.
+
+            ${{ steps.Changelog.outputs.changelog }}
           draft: false
-          prerelease: false
+          prerelease: true
 
       - name: Add archive asset to the release
         id: upload-release-asset
