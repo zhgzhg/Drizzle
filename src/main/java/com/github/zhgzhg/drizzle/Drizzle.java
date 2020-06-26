@@ -8,16 +8,21 @@ import cc.arduino.contributions.libraries.LibraryInstaller;
 import cc.arduino.contributions.packages.ContributedPackage;
 import cc.arduino.contributions.packages.ContributedPlatform;
 import cc.arduino.contributions.packages.ContributionInstaller;
+import cc.arduino.view.NotificationPopup;
 import com.github.gundy.semver4j.SemVer;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.log.ProgressPrinter;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
+import com.github.zhgzhg.drizzle.utils.text.TextUtils;
+import com.github.zhgzhg.drizzle.utils.update.UpdateUtils;
 import processing.app.Base;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
+import processing.app.EditorTab;
 import processing.app.PreferencesData;
+import processing.app.SketchFile;
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
 import processing.app.debug.TargetPlatform;
@@ -25,6 +30,9 @@ import processing.app.tools.Tool;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -41,11 +49,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
-    public static final String MENU_TITLE = "Bulk Resolve Marked Dependencies";
+    public static final String MENU_TITLE = "Apply Drizzle @ Markers";
+    public static final String MENU_AUTOGEN_TITLE = "Auto-generate @Board* Markers";
 
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
@@ -58,6 +69,8 @@ public class Drizzle implements Tool {
     private ProgressPrinter progressPrinter;
     private LogProxy logProxy;
     private UILocator uiLocator;
+
+    private JMenuItem boardAndSettingsGeneratorMenu = new JMenuItem(MENU_AUTOGEN_TITLE);
 
     @Override
     public void init(final Editor editor) {
@@ -83,6 +96,41 @@ public class Drizzle implements Tool {
         this.librariesIndex = BaseNoGui.librariesIndexer.getIndex();
         this.contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
         this.libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
+
+        this.boardAndSettingsGeneratorMenu.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                autogenBoardAndBoardSettingsMarkers(e);
+            }
+        });
+
+        this.editor.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentShown(final ComponentEvent e) {
+                Optional<JMenuItem> drizzleMenu = uiLocator.drizzleMenu();
+                drizzleMenu
+                        .<JPopupMenu>map(dm -> {
+                            Container parent = dm.getParent();
+                            if (parent instanceof JPopupMenu) {
+                                return (JPopupMenu) parent;
+                            }
+                            return null;
+                        })
+                        .ifPresent(m -> {
+                            int index = m.getComponentIndex(drizzleMenu.get());
+                            m.add(boardAndSettingsGeneratorMenu, index);
+                            m.revalidate();
+                            editor.removeComponentListener(this);
+                        });
+
+                SwingUtilities.invokeLater(() -> {
+                    if (!UpdateUtils.isTheLatestVersion(logProxy)) {
+                        NotificationPopup notification = UpdateUtils.createNewVersionPopupNotification(editor, logProxy);
+                        notification.begin();
+                    }
+                });
+            }
+        });
     }
 
     @Override
@@ -252,7 +300,7 @@ public class Drizzle implements Tool {
                 bmSettings.platform, candidateVersions.toString(), bmSettings.version);
 
         String chosenVersion = SemVer.maxSatisfying(candidateVersions, bmSettings.version);
-        if (chosenVersion != null && !chosenVersion.isEmpty()) {
+        if (TextUtils.isNotNullAndBlank(chosenVersion)) {
             int platfIndex = candidateVersions.indexOf(chosenVersion);
             ContributedPlatform platformToInstall = possiblePlatforms.get(platfIndex);
             this.logProxy.cliInfo("Selected platform version %s%n", platformToInstall.getParsedVersion());
@@ -378,7 +426,7 @@ public class Drizzle implements Tool {
             }
 
             String chosenVersion = SemVer.maxSatisfying(installCandidateVersions, libVer);
-            if (chosenVersion != null && !chosenVersion.isEmpty()) {
+            if (TextUtils.isNotNullAndBlank(chosenVersion)) {
                 int libIndex = installCandidateVersions.indexOf(chosenVersion);
                 ContributedLibrary l = installCandidates.get(libIndex);
                 this.logProxy.cliInfo("Picked library version %s%n", l.getParsedVersion());
@@ -554,5 +602,101 @@ public class Drizzle implements Tool {
         }
 
         return clickedItems;
+    }
+
+    private String makeAutogenHeadingText() {
+        return String.format("/**%n * Automatically generated markers by Drizzle %s dependency helper tool, automating the project setup: "
+                + "%n * To apply them make sure this file is saved, then click on Tools / Apply Markers."
+                + "%n * To obtain Drizzle's latest version visit: %s"
+                + "%n *", UpdateUtils.version(), UpdateUtils.webUrl());
+    }
+
+    private void autogenBoardAndBoardSettingsMarkers(final ActionEvent e) {
+        // a semi-naive implementation that should do the job for now
+
+        SketchFile primarySketch = this.editor.getSketch().getPrimaryFile();
+        EditorTab currentTab = this.editor.getCurrentTab();
+        if (currentTab.getSketchFile() != primarySketch) {
+            this.logProxy.uiError("To generate Drizzle markers select the %s tab", primarySketch.getPrettyName());
+            return;
+        }
+
+        String combinedMarkers = "";
+
+        JMenu boardMenu = this.uiLocator.boardsMenu().orElse(null);
+
+        String boardSettings = this.uiLocator.customMenusForCurrentlySelectedBoard().stream()
+                .filter(m -> m != boardMenu)
+                .map(m -> {
+                    String[] labelAndValue = TextUtils.labelAndUnquotedValue(m.getText());
+                    if (labelAndValue == null) return null;
+
+                    return Stream.of(labelAndValue)
+                            .filter(TextUtils::isNotNullAndBlank)
+                            .collect(Collectors.joining("->"));
+
+                })
+                .filter(TextUtils::isNotNullAndBlank)
+                .collect(Collectors.joining("||"));
+
+        String providerPackageName = PreferencesData.get("target_package", null);
+        String platformName = PreferencesData.get("target_platform", null);
+        String boardName = TextUtils.unquotedValueFromLabelPair(boardMenu != null ? boardMenu.getText() : null);
+
+        String board = "";
+
+        if (TextUtils.isNotNullAndBlank(boardName) && TextUtils.isNotNullAndBlank(platformName)) {
+            board = String.format("%s %s%s::%s", SourceExtractor.BOARDNAME_MARKER,
+                    (TextUtils.isNullOrBlank(providerPackageName) ? "" : providerPackageName + "::"), platformName, boardName);
+        } else {
+            this.logProxy.cliError("Cannot automatically generate %s marker%n", SourceExtractor.BOARDNAME_MARKER);
+        }
+
+        if (TextUtils.isNotNullAndBlank(boardSettings)) {
+            boardSettings = String.format("%s %s::%s::%s", SourceExtractor.BOARDSETTINGS_MARKER,
+                    (TextUtils.isNullOrBlank(platformName) ? "*" : platformName),
+                    (TextUtils.isNullOrBlank(boardName) ? "*" : boardName),
+                    boardSettings
+            );
+        } else {
+            this.logProxy.cliWarn("No suitable clickable menus found for %s marker%n", SourceExtractor.BOARD_SETTINGS);
+        }
+
+        String boardManager = "";
+        if (TextUtils.isNotNullAndBlank(platformName)) {
+            Map<String, ContributedPlatform> possiblePlatforms = BaseNoGui.indexer.getPackages().stream()
+                    .map(ContributedPackage::getPlatforms)
+                    .flatMap(List::stream)
+                    .filter(cp -> !cp.isBuiltIn() && cp.isInstalled() && platformName.equals(cp.getArchitecture())
+                            && TextUtils.isNotNullAndBlank(cp.getUrl()))
+                    .collect(Collectors.toMap(ContributedPlatform::getVersion, Function.identity()));
+
+            if (!possiblePlatforms.isEmpty()) {
+                String s = SemVer.maxSatisfying(possiblePlatforms.keySet(), "*");
+                if (s == null) s = "*";
+                boardManager = String.format("%s %s::%s%s", SourceExtractor.BOARDMANAGER_MARKER,
+                        platformName, s, (!s.equals("*") ? "::" + possiblePlatforms.get(s).getUrl() : ""));
+            }
+        }
+
+        if (TextUtils.isNullOrBlank(boardManager)) {
+            this.logProxy.cliInfo("Skipped the generation of %s marker", SourceExtractor.BOARDMANAGER_MARKER);
+        }
+
+        if (TextUtils.anyNullOrBlank(boardManager, board, boardSettings)) {
+            String comment = TextUtils.concatenate(TextUtils::isNotNullAndBlank, s -> String.format("%n * %s", s), boardManager, board,
+                    boardSettings);
+
+            StringBuilder sb = new StringBuilder(makeAutogenHeadingText())
+                    .append(comment)
+                    .append(String.format("%n */%n%n"))
+                    .append(currentTab.getText());
+
+            currentTab.setScrollPosition(0);
+            currentTab.setText(sb.toString());
+            currentTab.invalidate();
+
+            this.logProxy.uiInfo("Markers auto-generation is done. Don't forget to save the changes.");
+        }
     }
 }
