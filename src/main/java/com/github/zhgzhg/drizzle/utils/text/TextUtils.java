@@ -24,22 +24,22 @@ public class TextUtils {
         return false;
     }
 
-    public static boolean isNotNullAndBlank(String param) {
+    public static boolean isNotNullOrBlank(String param) {
         return !isNullOrBlank(param);
     }
 
-    public static boolean allNotNullAndBlank(String param, String... otherParams) {
+    public static boolean allNotNullOrBlank(String param, String... otherParams) {
         if (isNullOrBlank(param) || otherParams == null || otherParams.length == 0) return false;
 
         return !anyNullOrBlank(param, otherParams);
     }
 
-    public static boolean anyNotNullAndBlank(String param, String... otherParams) {
-        if (isNotNullAndBlank(param)) return true;
+    public static boolean anyNotNullOrBlank(String param, String... otherParams) {
+        if (isNotNullOrBlank(param)) return true;
 
         if (otherParams != null && otherParams.length > 0) {
             for (String op : otherParams) {
-                if (isNotNullAndBlank(op)) {
+                if (isNotNullOrBlank(op)) {
                     return true;
                 }
             }

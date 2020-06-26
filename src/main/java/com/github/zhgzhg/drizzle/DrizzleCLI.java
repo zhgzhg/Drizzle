@@ -168,7 +168,7 @@ public class DrizzleCLI {
             if (projSettings.boardManager != null) {
                 System.out.printf("%s %s::%s%s%n", SourceExtractor.BOARDMANAGER_MARKER, projSettings.boardManager.platform,
                         projSettings.boardManager.version,
-                        (TextUtils.isNotNullAndBlank(projSettings.boardManager.url) ? "::" + projSettings.boardManager.url : "")
+                        (TextUtils.isNotNullOrBlank(projSettings.boardManager.url) ? "::" + projSettings.boardManager.url : "")
                 );
             }
 
@@ -176,7 +176,7 @@ public class DrizzleCLI {
                 System.out.printf("%s ", SourceExtractor.BOARDNAME_MARKER);
 
                 String providerPackage = projSettings.board.providerPackage;
-                if (TextUtils.isNotNullAndBlank(providerPackage)) {
+                if (TextUtils.isNotNullOrBlank(providerPackage)) {
                     System.out.printf("%s::", providerPackage);
                 }
 

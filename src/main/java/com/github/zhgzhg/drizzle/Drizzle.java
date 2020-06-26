@@ -300,7 +300,7 @@ public class Drizzle implements Tool {
                 bmSettings.platform, candidateVersions.toString(), bmSettings.version);
 
         String chosenVersion = SemVer.maxSatisfying(candidateVersions, bmSettings.version);
-        if (TextUtils.isNotNullAndBlank(chosenVersion)) {
+        if (TextUtils.isNotNullOrBlank(chosenVersion)) {
             int platfIndex = candidateVersions.indexOf(chosenVersion);
             ContributedPlatform platformToInstall = possiblePlatforms.get(platfIndex);
             this.logProxy.cliInfo("Selected platform version %s%n", platformToInstall.getParsedVersion());
@@ -426,7 +426,7 @@ public class Drizzle implements Tool {
             }
 
             String chosenVersion = SemVer.maxSatisfying(installCandidateVersions, libVer);
-            if (TextUtils.isNotNullAndBlank(chosenVersion)) {
+            if (TextUtils.isNotNullOrBlank(chosenVersion)) {
                 int libIndex = installCandidateVersions.indexOf(chosenVersion);
                 ContributedLibrary l = installCandidates.get(libIndex);
                 this.logProxy.cliInfo("Picked library version %s%n", l.getParsedVersion());
@@ -632,11 +632,11 @@ public class Drizzle implements Tool {
                     if (labelAndValue == null) return null;
 
                     return Stream.of(labelAndValue)
-                            .filter(TextUtils::isNotNullAndBlank)
+                            .filter(TextUtils::isNotNullOrBlank)
                             .collect(Collectors.joining("->"));
 
                 })
-                .filter(TextUtils::isNotNullAndBlank)
+                .filter(TextUtils::isNotNullOrBlank)
                 .collect(Collectors.joining("||"));
 
         String providerPackageName = PreferencesData.get("target_package", null);
@@ -645,14 +645,14 @@ public class Drizzle implements Tool {
 
         String board = "";
 
-        if (TextUtils.isNotNullAndBlank(boardName) && TextUtils.isNotNullAndBlank(platformName)) {
+        if (TextUtils.isNotNullOrBlank(boardName) && TextUtils.isNotNullOrBlank(platformName)) {
             board = String.format("%s %s%s::%s", SourceExtractor.BOARDNAME_MARKER,
                     (TextUtils.isNullOrBlank(providerPackageName) ? "" : providerPackageName + "::"), platformName, boardName);
         } else {
             this.logProxy.cliError("Cannot automatically generate %s marker%n", SourceExtractor.BOARDNAME_MARKER);
         }
 
-        if (TextUtils.isNotNullAndBlank(boardSettings)) {
+        if (TextUtils.isNotNullOrBlank(boardSettings)) {
             boardSettings = String.format("%s %s::%s::%s", SourceExtractor.BOARDSETTINGS_MARKER,
                     (TextUtils.isNullOrBlank(platformName) ? "*" : platformName),
                     (TextUtils.isNullOrBlank(boardName) ? "*" : boardName),
@@ -663,12 +663,12 @@ public class Drizzle implements Tool {
         }
 
         String boardManager = "";
-        if (TextUtils.isNotNullAndBlank(platformName)) {
+        if (TextUtils.isNotNullOrBlank(platformName)) {
             Map<String, ContributedPlatform> possiblePlatforms = BaseNoGui.indexer.getPackages().stream()
                     .map(ContributedPackage::getPlatforms)
                     .flatMap(List::stream)
                     .filter(cp -> !cp.isBuiltIn() && cp.isInstalled() && platformName.equals(cp.getArchitecture())
-                            && TextUtils.isNotNullAndBlank(cp.getUrl()))
+                            && TextUtils.isNotNullOrBlank(cp.getUrl()))
                     .collect(Collectors.toMap(ContributedPlatform::getVersion, Function.identity()));
 
             if (!possiblePlatforms.isEmpty()) {
@@ -683,8 +683,8 @@ public class Drizzle implements Tool {
             this.logProxy.cliInfo("Skipped the generation of %s marker", SourceExtractor.BOARDMANAGER_MARKER);
         }
 
-        if (TextUtils.anyNullOrBlank(boardManager, board, boardSettings)) {
-            String comment = TextUtils.concatenate(TextUtils::isNotNullAndBlank, s -> String.format("%n * %s", s), boardManager, board,
+        if (TextUtils.anyNotNullOrBlank(boardManager, board, boardSettings)) {
+            String comment = TextUtils.concatenate(TextUtils::isNotNullOrBlank, s -> String.format("%n * %s", s), boardManager, board,
                     boardSettings);
 
             StringBuilder sb = new StringBuilder(makeAutogenHeadingText())

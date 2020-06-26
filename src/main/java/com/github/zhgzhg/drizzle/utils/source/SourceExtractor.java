@@ -118,11 +118,11 @@ public class SourceExtractor {
             boolean matching = (TextUtils.isNullOrBlank(board.platform) && TextUtils.isNullOrBlank(board.name));
 
             if (!matching) {
-                if (TextUtils.allNotNullAndBlank(board.platform, board.name)) {
+                if (TextUtils.allNotNullOrBlank(board.platform, board.name)) {
                     matching = board.platform.equals(platformName) && board.name.equals(boardName);
-                } else if (TextUtils.isNotNullAndBlank(board.platform)) {
+                } else if (TextUtils.isNotNullOrBlank(board.platform)) {
                     matching = board.platform.equals(platformName);
-                } else if (TextUtils.isNotNullAndBlank(board.name)) {
+                } else if (TextUtils.isNotNullOrBlank(board.name)) {
                     matching = board.name.equals(boardName);
                 }
             }
@@ -171,7 +171,7 @@ public class SourceExtractor {
                 String boardName = boardCandidate.get(BOARD_GROUP);
 
 
-                if (result == null && TextUtils.allNotNullAndBlank(platformName, boardName)) {
+                if (result == null && TextUtils.allNotNullOrBlank(platformName, boardName)) {
                     result = new Board(providerPackage, platformName, boardName);
                 } else {
                     this.logProxy.cliError("Ignoring additional %s %s::%s::%s%n", BOARDNAME_MARKER, providerPackage,
@@ -244,7 +244,7 @@ public class SourceExtractor {
                     ver = (ver != null ? ver.trim() : null);
 
                     String url = result.getValue().get(URL_GROUP);
-                    if (TextUtils.isNotNullAndBlank(url)) {
+                    if (TextUtils.isNotNullOrBlank(url)) {
                         try {
                             new URL(url);
                         } catch (MalformedURLException e) {
