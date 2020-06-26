@@ -605,10 +605,10 @@ public class Drizzle implements Tool {
     }
 
     private String makeAutogenHeadingText() {
-        return String.format("/**%n * Automatically generated markers by Drizzle %s dependency helper tool, automating the project setup: "
-                + "%n * To apply them make sure this file is saved, then click on Tools / Apply Markers."
-                + "%n * To obtain Drizzle's latest version visit: %s"
-                + "%n *", UpdateUtils.version(), UpdateUtils.webUrl());
+        return String.format("/**%n * Automatically generated markers by Drizzle %s dependency helper tool, based on the selected"
+                + "%n * at that moment board options in Arduino IDE's UI. To apply them make sure this file is saved, then click on"
+                + "%n * Tools / %s. To obtain Drizzle visit: %s"
+                + "%n *", UpdateUtils.version(), MENU_TITLE, UpdateUtils.webUrl());
     }
 
     private void autogenBoardAndBoardSettingsMarkers(final ActionEvent e) {
