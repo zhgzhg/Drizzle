@@ -4,7 +4,7 @@ Drizzle
 
 A lightweight dependency helper for Arduino IDE.
 
-By clicking on "Tools / Bulk Resolve Marked Dependencies" Drizzle will download the libraries, platform, set the board, and its specific
+By clicking on "Tools / Apply Drizzle @ Markers" Drizzle will download the libraries, platform, set the board, and its specific
 settings, __all described into the comments of your sketch file__.
 
 Drizzle operates on top of Arduino IDE's library and board manager. It enables them to provide components, which now can be described into
@@ -49,6 +49,9 @@ Create a comment inside the main file of your Arduino sketch. Preferably at the 
 
 Use markers like "@DependsOn", "@BoardManager", "@BoardSettings", and "@Board" to describe the sketch's requirements.
 Like that the code self-explains its dependencies, so anyone interested in compiling it can do that with 2 clicks.
+
+By clicking on "Tools / Auto-generate @Board* Markers" Drizzle will generate "@Board*" markers by looking into the currently
+selected board settings. The text will be inserted as a C-style comment at the beginning of your main sketch file. 
 
 Using and combining Drizzle's markers is always optional. 
  
@@ -119,9 +122,9 @@ CLI Extras
 ----------
 
 Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
-from JSON file Drizzle markers are produced is also possible.
+from JSON file Drizzle markers will be produced is also supported.
 
-For e.g. `java -jar drizzle-0.7.0.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.8.0.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -161,7 +164,7 @@ For e.g. `java -jar drizzle-0.7.0.jar --parse hello-world.ino` will produce:
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.7.0.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.8.0.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
