@@ -673,9 +673,7 @@ public class Drizzle implements Tool {
 
             if (!possiblePlatforms.isEmpty()) {
                 String s = SemVer.maxSatisfying(possiblePlatforms.keySet(), "*");
-                if (s == null) s = "*";
-                boardManager = String.format("%s %s::%s%s", SourceExtractor.BOARDMANAGER_MARKER,
-                        platformName, s, (!s.equals("*") ? "::" + possiblePlatforms.get(s).getUrl() : ""));
+                boardManager = String.format("%s %s::%s", SourceExtractor.BOARDMANAGER_MARKER, platformName, s);
             }
         }
 
