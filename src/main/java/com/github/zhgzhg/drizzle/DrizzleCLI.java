@@ -2,6 +2,8 @@ package com.github.zhgzhg.drizzle;
 
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
+import com.github.zhgzhg.drizzle.utils.text.TextUtils;
+import com.github.zhgzhg.drizzle.utils.update.UpdateUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializationContext;
@@ -123,8 +125,7 @@ public class DrizzleCLI {
 
     public static void main(String[] args) {
         if (args.length > 0 && (args[0].equals("-h") || args[0].equals("--help"))) {
-            String implementationVersion = DrizzleCLI.class.getPackage().getImplementationVersion();
-            if (implementationVersion == null) implementationVersion = "SNAPSHOT";
+            String implementationVersion = UpdateUtils.version();
 
             System.out.printf("Drizzle %s CLI Helper%n", implementationVersion);
 
@@ -167,8 +168,7 @@ public class DrizzleCLI {
             if (projSettings.boardManager != null) {
                 System.out.printf("%s %s::%s%s%n", SourceExtractor.BOARDMANAGER_MARKER, projSettings.boardManager.platform,
                         projSettings.boardManager.version,
-                        (projSettings.boardManager.url != null && !projSettings.boardManager.url.isEmpty() ?
-                                "::" + projSettings.boardManager.url : "")
+                        (TextUtils.isNotNullAndBlank(projSettings.boardManager.url) ? "::" + projSettings.boardManager.url : "")
                 );
             }
 
@@ -176,7 +176,7 @@ public class DrizzleCLI {
                 System.out.printf("%s ", SourceExtractor.BOARDNAME_MARKER);
 
                 String providerPackage = projSettings.board.providerPackage;
-                if (providerPackage != null && !providerPackage.isEmpty()) {
+                if (TextUtils.isNotNullAndBlank(providerPackage)) {
                     System.out.printf("%s::", providerPackage);
                 }
 

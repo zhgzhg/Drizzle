@@ -3,6 +3,7 @@ package com.github.zhgzhg.drizzle.utils.source;
 import com.github.zhgzhg.drizzle.parser.CPP14Lexer;
 import com.github.zhgzhg.drizzle.parser.CPP14Parser;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
+import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import org.antlr.v4.runtime.ANTLRInputStream;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CommonTokenStream;
@@ -107,21 +108,21 @@ public class SourceExtractor {
             Objects.requireNonNull(board);
             this.board = new Board(
                     board.providerPackage,
-                    (board.platform == null || board.platform.isEmpty() || "*".equals(board.platform) ? null : board.platform),
-                    (board.name == null || board.name.isEmpty() || "*".equals(board.name) ? null : board.name)
+                    (TextUtils.isNullOrBlank(board.platform) || "*".equals(board.platform) ? null : board.platform),
+                    (TextUtils.isNullOrBlank(board.name) || "*".equals(board.name) ? null : board.name)
             );
             this.clickableOptions = new LinkedList<>();
         }
 
         public boolean suitsRequirements(String platformName, String boardName) {
-            boolean matching = ((board.platform == null || board.platform.isEmpty()) && (board.name == null || board.name.isEmpty()));
+            boolean matching = (TextUtils.isNullOrBlank(board.platform) && TextUtils.isNullOrBlank(board.name));
 
             if (!matching) {
-                if (board.platform != null && !board.platform.isEmpty() && board.name != null && !board.name.isEmpty()) {
+                if (TextUtils.allNotNullAndBlank(board.platform, board.name)) {
                     matching = board.platform.equals(platformName) && board.name.equals(boardName);
-                } else if (board.platform != null && !board.platform.isEmpty()) {
+                } else if (TextUtils.isNotNullAndBlank(board.platform)) {
                     matching = board.platform.equals(platformName);
-                } else if (board.name != null && !board.name.isEmpty()) {
+                } else if (TextUtils.isNotNullAndBlank(board.name)) {
                     matching = board.name.equals(boardName);
                 }
             }
@@ -170,8 +171,7 @@ public class SourceExtractor {
                 String boardName = boardCandidate.get(BOARD_GROUP);
 
 
-                if (result == null && platformName != null && !platformName.isEmpty() && boardName != null
-                        && !boardName.isEmpty()) {
+                if (result == null && TextUtils.allNotNullAndBlank(platformName, boardName)) {
                     result = new Board(providerPackage, platformName, boardName);
                 } else {
                     this.logProxy.cliError("Ignoring additional %s %s::%s::%s%n", BOARDNAME_MARKER, providerPackage,
@@ -244,7 +244,7 @@ public class SourceExtractor {
                     ver = (ver != null ? ver.trim() : null);
 
                     String url = result.getValue().get(URL_GROUP);
-                    if (url != null && !url.isEmpty()) {
+                    if (TextUtils.isNotNullAndBlank(url)) {
                         try {
                             new URL(url);
                         } catch (MalformedURLException e) {
