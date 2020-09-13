@@ -90,7 +90,7 @@ public class Drizzle implements Tool {
             public void uiInfo(final String format, final Object... params) { editor.statusNotice(String.format(format, params)); }
         };
         this.progressPrinter = new ProgressPrinter(logProxy);
-        this.sourceExtractor = new SourceExtractor(logProxy);
+        this.sourceExtractor = new SourceExtractor(editor, logProxy);
         this.progressListener = progress -> progressPrinter.progress();
 
         this.librariesIndex = BaseNoGui.librariesIndexer.getIndex();

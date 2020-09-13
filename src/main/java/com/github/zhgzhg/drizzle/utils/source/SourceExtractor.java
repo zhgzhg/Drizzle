@@ -2,6 +2,7 @@ package com.github.zhgzhg.drizzle.utils.source;
 
 import com.github.zhgzhg.drizzle.parser.CPP14Lexer;
 import com.github.zhgzhg.drizzle.parser.CPP14Parser;
+import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import org.antlr.v4.runtime.ANTLRInputStream;
@@ -12,13 +13,17 @@ import processing.app.Editor;
 import processing.app.SketchFile;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -63,6 +68,9 @@ public class SourceExtractor {
 
     public static final Pattern DEPENDS_ON_LIB_VERSION =
             Pattern.compile("^[^@]*" + DEPENDSON_MARKER + "\\s+(?<" + LIB_GROUP + ">[^:]+)::(?<" + VER_GROUP + ">.+)$");
+
+    private Editor editor;
+    private File drizzleJsonFile;
 
     private LogProxy logProxy;
 
@@ -137,8 +145,22 @@ public class SourceExtractor {
         }
     }
 
-    public SourceExtractor(LogProxy logProxy) {
+    public SourceExtractor(Editor editor, LogProxy logProxy) {
+        this.editor = editor;
         this.logProxy = logProxy;
+        this.locateDrizzleJsonFile();
+    }
+
+    private boolean locateDrizzleJsonFile() {
+        if (this.drizzleJsonFile == null && editor != null && editor.getSketch() != null) {
+            SketchFile primaryFile = editor.getSketch().getPrimaryFile();
+            if (primaryFile != null) {
+                Path containingDir = primaryFile.getFile().toPath().getParent();
+                this.drizzleJsonFile = new File(containingDir.toFile(), "drizzle.json");
+            }
+        }
+
+        return this.drizzleJsonFile != null && this.drizzleJsonFile.exists();
     }
 
     public static String loadSourceFromPrimarySketch(Editor editor) throws IOException {
@@ -153,7 +175,24 @@ public class SourceExtractor {
         return null;
     }
 
+    public ProjectSettings loadAllFromDrizzleJson() {
+        if (!locateDrizzleJsonFile()) return null;
+
+        try {
+            String json = new String(Files.readAllBytes(this.drizzleJsonFile.toPath()));
+            return ProjectSettings.fromJSON(json, this.logProxy);
+        } catch (IOException ex) {
+            logProxy.cliErrorln(ex);
+        }
+
+        return null;
+    }
+
     public Board dependentBoardFromMainSketchSource(String source) {
+        ProjectSettings projectSettings = this.loadAllFromDrizzleJson();
+        if (projectSettings != null) {
+            return projectSettings.getBoard();
+        }
 
         try {
             Map<String, Map<String, String>> boardPlatformAndNames = extractMarkersKeyAndParams(extractAllCommentsFromSource(source), BOARD,
@@ -188,6 +227,12 @@ public class SourceExtractor {
     }
 
     public List<BoardSettings> dependentBoardClickableSettingsFromMainSketchSource(String source) {
+        ProjectSettings projectSettings = this.loadAllFromDrizzleJson();
+        if (projectSettings != null) {
+            List<BoardSettings> boardSettings = projectSettings.getBoardSettings();
+            return (boardSettings != null ? boardSettings : Collections.emptyList());
+        }
+
         try {
             Map<String, Map<String, String>> boardAndClickableSettings = extractMarkersKeyAndParams(
                     extractAllCommentsFromSource(source), BOARD_SETTINGS, BOARDSETTINGS_MARKER, PLATFORM_GROUP,
@@ -227,6 +272,10 @@ public class SourceExtractor {
     }
 
     public BoardManager dependentBoardManagerFromMainSketchSource(String source) {
+        ProjectSettings projectSettings = this.loadAllFromDrizzleJson();
+        if (projectSettings != null) {
+            return projectSettings.getBoardManager();
+        }
 
         try {
             Map<String, Map<String, String>> platformBoardUrl = extractMarkersKeyAndParams(extractAllCommentsFromSource(source),
@@ -271,6 +320,12 @@ public class SourceExtractor {
     }
 
     public Map<String, String> dependentLibsFromMainSketchSource(String source) {
+        ProjectSettings projectSettings = this.loadAllFromDrizzleJson();
+        if (projectSettings != null) {
+            Map<String, String> libraries = projectSettings.getLibraries();
+            return (libraries != null ? libraries : Collections.emptyMap());
+        }
+
         try {
             return extractMarkersKeyValue(
                     extractAllCommentsFromSource(source), DEPENDS_ON_LIB_VERSION, DEPENDSON_MARKER, LIB_GROUP, VER_GROUP);

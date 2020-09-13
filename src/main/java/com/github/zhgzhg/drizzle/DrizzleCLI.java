@@ -82,7 +82,7 @@ public class DrizzleCLI {
             System.exit(-3);
         }
 
-        SourceExtractor sourceExtractor = new SourceExtractor(new LogProxy() {
+        SourceExtractor sourceExtractor = new SourceExtractor(null, new LogProxy() {
             @Override
             public PrintStream stderr() {
                 // silence it to not polute the CLI output. the exit codes will be still available

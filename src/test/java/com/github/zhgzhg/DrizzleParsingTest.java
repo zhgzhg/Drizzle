@@ -80,7 +80,7 @@ public class DrizzleParsingTest {
     public void sourceMarkerParserTest() throws IOException {
         String source = loadWholeTextResource("sample_sketch.ino");
         String source2 = loadWholeTextResource("sample_sketch2.ino");
-        SourceExtractor sourceExtractor = new SourceExtractor(strictLogProxy);
+        SourceExtractor sourceExtractor = new SourceExtractor(null, strictLogProxy);
 
         ProjectSettings projectSettings = createProjectSettings(sourceExtractor, source);
         ProjectSettings projectSettings2 = createProjectSettings(sourceExtractor, source2);
@@ -102,7 +102,7 @@ public class DrizzleParsingTest {
         String json = loadWholeTextResource("sample_sketch_parsed.json");
         ProjectSettings projSettings = gson.fromJson(json, ProjectSettings.class);
         ProjectSettings projSettingsTemplate = createProjectSettings(
-                new SourceExtractor(this.strictLogProxy), loadWholeTextResource("sample_sketch.ino"));
+                new SourceExtractor(null, this.strictLogProxy), loadWholeTextResource("sample_sketch.ino"));
 
         assertEquals(projSettingsTemplate.getBoardManager().toString(), projSettings.getBoardManager().toString());
         assertEquals(projSettingsTemplate.getBoard().toString(), projSettings.getBoard().toString());
@@ -112,7 +112,7 @@ public class DrizzleParsingTest {
         json = loadWholeTextResource("sample_sketch_parsed2.json");
         projSettings = gson.fromJson(json, ProjectSettings.class);
         projSettingsTemplate = createProjectSettings(
-                new SourceExtractor(this.strictLogProxy), loadWholeTextResource("sample_sketch2.ino"));
+                new SourceExtractor(null, this.strictLogProxy), loadWholeTextResource("sample_sketch2.ino"));
 
         assertEquals(projSettingsTemplate.getBoardManager().toString(), projSettings.getBoardManager().toString());
         assertEquals(projSettingsTemplate.getBoard().toString(), projSettings.getBoard().toString());
