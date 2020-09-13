@@ -9,6 +9,7 @@ import processing.app.I18n;
 import javax.swing.*;
 import java.awt.*;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiPredicate;
 import java.util.function.Predicate;
@@ -66,11 +67,27 @@ public class UILocator {
                 .collect(Collectors.toList());
     }
 
+    public JMenu getMenuByName(JMenuBar from, String name) {
+        if (from != null) {
+            for (int i = 0; i < from.getMenuCount(); ++i) {
+                String menuName = from.getMenu(i).getText();
+
+                if (Objects.equals(name, menuName)) {
+                    return from.getMenu(i);
+                }
+            }
+        }
+
+        return null;
+    }
+
     public Optional<JMenu> sketchIncludeLibraryMenu() {
         return Stream.of(editor.getContentPane().getParent().getComponents())
                 .filter(c -> c instanceof JMenuBar)
-                .map(jb -> ((JMenuBar) jb).getMenu(2).getMenuComponent(6)) // a.k.a "Sketch/Include Library"
-                .filter(jm -> jm instanceof JMenu)
+                .map(c -> getMenuByName((JMenuBar) c, I18n.tr("Sketch")))
+                .filter(Objects::nonNull)
+                .flatMap(jm -> Stream.of(jm.getMenuComponents()))
+                .filter(c -> c instanceof JMenu && I18n.tr("Include Library").equals(((JMenu) c).getText()))
                 .map(jm -> (JMenu) jm)
                 .findFirst();
     }
@@ -78,7 +95,10 @@ public class UILocator {
     public Optional<JMenu> filesExamplesMenu() {
         return Stream.of(editor.getContentPane().getParent().getComponents())
                 .filter(c -> c instanceof JMenuBar)
-                .map(jb -> ((JMenuBar) jb).getMenu(0).getMenuComponent(4)) // a.k.a "File/Examples"
+                .map(c -> getMenuByName((JMenuBar) c, I18n.tr("File")))
+                .filter(Objects::nonNull)
+                .flatMap(jm -> Stream.of(jm.getMenuComponents()))
+                .filter(c -> c instanceof JMenu && I18n.tr("Examples").equals(((JMenu) c).getText()))
                 .map(jm -> (JMenu) jm)
                 .findFirst();
     }
