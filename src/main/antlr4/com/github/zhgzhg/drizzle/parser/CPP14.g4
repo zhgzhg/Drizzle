@@ -21,7 +21,7 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  *
- * Slightly modified, obtained from https://raw.githubusercontent.com/antlr/grammars-v4/master/cpp/CPP14.g4
+ * Slightly modified, obtained from https://raw.githubusercontent.com/antlr/grammars-v4/484b045abe3a2cac49d9959dc3537f349b26d1fd/cpp/CPP14.g4
  ******************************************************************************/
 grammar CPP14;
 /*Basic concepts*/
@@ -38,7 +38,7 @@ translationunit
 
 
 primaryexpression
-   : literal
+   : literal (literal)*
    | This
    | '(' expression ')'
    | idexpression
@@ -736,7 +736,7 @@ declarator
 
 ptrdeclarator
    : noptrdeclarator
-   | ptroperator ptrdeclarator
+   | ptroperator Const? ptrdeclarator
    ;
 
 noptrdeclarator
