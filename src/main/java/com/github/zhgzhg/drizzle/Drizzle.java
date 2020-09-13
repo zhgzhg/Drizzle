@@ -61,7 +61,6 @@ public class Drizzle implements Tool {
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
     private ContributionInstaller contributionInstaller;
-    private LibrariesIndex librariesIndex;
     private LibraryInstaller libraryInstaller;
     private SourceExtractor sourceExtractor;
 
@@ -93,7 +92,6 @@ public class Drizzle implements Tool {
         this.sourceExtractor = new SourceExtractor(editor, logProxy);
         this.progressListener = progress -> progressPrinter.progress();
 
-        this.librariesIndex = BaseNoGui.librariesIndexer.getIndex();
         this.contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
         this.libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
 
@@ -377,7 +375,7 @@ public class Drizzle implements Tool {
             this.logProxy.uiError("Error Updating Packages Info: %s", e.getMessage());
         }
 
-        List<ContributedLibrary> libraries = librariesIndex.getLibraries();
+        List<ContributedLibrary> libraries = BaseNoGui.librariesIndexer.getIndex().getLibraries();
         if (libraries == null || libraries.isEmpty()) {
             return Collections.emptyList();
         }
