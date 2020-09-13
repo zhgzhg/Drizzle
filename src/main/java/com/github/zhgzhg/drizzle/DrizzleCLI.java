@@ -1,127 +1,22 @@
 package com.github.zhgzhg.drizzle;
 
+import com.github.zhgzhg.drizzle.utils.json.BoardSettingsSerializerCustomizer;
+import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
-import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import com.github.zhgzhg.drizzle.utils.update.UpdateUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
-import com.google.gson.annotations.SerializedName;
 
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintStream;
-import java.lang.reflect.Type;
 import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class DrizzleCLI {
-    public static class BoardSettingsSerializerCustomizer implements JsonSerializer<SourceExtractor.BoardSettings>,
-            JsonDeserializer<SourceExtractor.BoardSettings> {
-
-        public static final String BOARD_INFO_HOLDER = "board";
-        public static final String CLICKABLE_OPTIONS_HOLDER = "clickable_options";
-
-        public static final String NAME = "name";
-        public static final String PLATFORM = "platform";
-        public static final String PROVIDER_PACKAGE = "providerPackage";
-
-        @Override
-        public JsonElement serialize(final SourceExtractor.BoardSettings src, final Type typeOfSrc,
-                final JsonSerializationContext context) {
-
-            JsonObject board = context.serialize(src.board, SourceExtractor.Board.class).getAsJsonObject();
-
-            JsonPrimitive platform = board.getAsJsonPrimitive(PLATFORM);
-            if (platform == null || platform.getAsString().isEmpty()) {
-                board.add(PLATFORM, new JsonPrimitive("*"));
-            }
-            JsonPrimitive boardName = board.getAsJsonPrimitive(NAME);
-            if (boardName == null || boardName.getAsString().isEmpty()) {
-                board.add(NAME, new JsonPrimitive("*"));
-            }
-            board.remove(PROVIDER_PACKAGE);
-
-            JsonElement clickableOptions = context.serialize(src.clickableOptions, List.class);
-
-            JsonObject result = new JsonObject();
-            result.add(BOARD_INFO_HOLDER, board);
-            result.add(CLICKABLE_OPTIONS_HOLDER, clickableOptions);
-
-            return result;
-        }
-
-        @Override
-        public SourceExtractor.BoardSettings deserialize(final JsonElement json, final Type typeOfT,
-                final JsonDeserializationContext context) {
-
-            SourceExtractor.Board board = context.deserialize(
-                    json.getAsJsonObject().getAsJsonObject(BOARD_INFO_HOLDER), SourceExtractor.Board.class);
-
-            List<List<String>> clickableOptions =
-                    context.deserialize(json.getAsJsonObject().getAsJsonArray(CLICKABLE_OPTIONS_HOLDER), List.class);
-
-            SourceExtractor.BoardSettings boardSettings = new SourceExtractor.BoardSettings(board);
-            boardSettings.clickableOptions.addAll(clickableOptions);
-            return boardSettings;
-        }
-    }
-
-    public static class ProjectSettings {
-        @SerializedName("board_manager")
-        private SourceExtractor.BoardManager boardManager;
-        private SourceExtractor.Board board;
-        @SerializedName("board_settings")
-        private List<SourceExtractor.BoardSettings> boardSettings;
-        private Map<String, String> libraries;
-
-        public SourceExtractor.BoardManager getBoardManager() {
-            return boardManager;
-        }
-
-        public void setBoardManager(final SourceExtractor.BoardManager boardManager) {
-            this.boardManager = boardManager;
-        }
-
-        public SourceExtractor.Board getBoard() {
-            return board;
-        }
-
-        public void setBoard(final SourceExtractor.Board board) {
-            this.board = board;
-        }
-
-        public List<SourceExtractor.BoardSettings> getBoardSettings() {
-            return boardSettings;
-        }
-
-        public void setBoardSettings(final List<SourceExtractor.BoardSettings> boardSettings) {
-            this.boardSettings = boardSettings;
-        }
-
-        public Map<String, String> getLibraries() {
-            return libraries;
-        }
-
-        public void setLibraries(final Map<String, String> libraries) {
-            this.libraries = libraries;
-        }
-
-        public boolean containsData() {
-            return boardManager != null || board != null || boardSettings != null || libraries != null;
-        }
-    }
 
     public static void main(String[] args) {
         if (args.length > 0 && (args[0].equals("-h") || args[0].equals("--help"))) {
@@ -159,53 +54,18 @@ public class DrizzleCLI {
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
                 .create();
+
         try {
-            ProjectSettings projSettings = gson.fromJson(new FileReader(jsonFile), ProjectSettings.class);
+            String jsonData = new String(Files.readAllBytes(Paths.get(jsonFile)));
+
+            ProjectSettings projSettings = ProjectSettings.fromJSON(jsonData, new LogProxy());
             if (projSettings == null || !projSettings.containsData()) {
                 throw new IllegalStateException("Unable to generate Drizzle markers from the JSON");
             }
 
-            if (projSettings.boardManager != null) {
-                System.out.printf("%s %s::%s%s%n", SourceExtractor.BOARDMANAGER_MARKER, projSettings.boardManager.platform,
-                        projSettings.boardManager.version,
-                        (TextUtils.isNotNullOrBlank(projSettings.boardManager.url) ? "::" + projSettings.boardManager.url : "")
-                );
-            }
+            System.out.print(projSettings);
 
-            if (projSettings.board != null) {
-                System.out.printf("%s ", SourceExtractor.BOARDNAME_MARKER);
-
-                String providerPackage = projSettings.board.providerPackage;
-                if (TextUtils.isNotNullOrBlank(providerPackage)) {
-                    System.out.printf("%s::", providerPackage);
-                }
-
-                System.out.printf("%s::%s%n", projSettings.board.platform, projSettings.board.name);
-            }
-
-            if (projSettings.boardSettings != null) {
-                projSettings.boardSettings.forEach(bs -> {
-                    String opts = bs.clickableOptions.stream()
-                            .map(ls -> String.join("->", ls))
-                            .collect(Collectors.joining("||"));
-
-                    String platform = bs.board.platform;
-                    if (platform == null || platform.isEmpty()) platform = "*";
-
-                    String name = bs.board.name;
-                    if (name == null || name.isEmpty()) name = "*";
-
-                    System.out.printf("%s %s::%s::%s%n", SourceExtractor.BOARDSETTINGS_MARKER, platform, name, opts);
-                });
-            }
-
-            if (projSettings.libraries != null) {
-                projSettings.libraries.forEach((k, v) ->
-                    System.out.printf("%s %s::%s%n", SourceExtractor.DEPENDSON_MARKER, k, v)
-                );
-            }
-
-        } catch (IllegalStateException | FileNotFoundException e) {
+        } catch (IllegalStateException | IOException e) {
             e.printStackTrace(System.err);
             System.exit(-5);
         }
@@ -244,20 +104,7 @@ public class DrizzleCLI {
             System.exit(-4);
         }
 
-        SourceExtractor.BoardManager boardManager = sourceExtractor.dependentBoardManagerFromMainSketchSource(source);
-        SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
-        List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
-        Map<String, String> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
-
-        ProjectSettings projectSettings = new ProjectSettings();
-        projectSettings.setBoardManager(boardManager);
-        projectSettings.setBoard(board);
-        projectSettings.setBoardSettings(boardSettings);
-        projectSettings.setLibraries(libraries);
-
-        Gson gson = new GsonBuilder().disableHtmlEscaping().serializeNulls().setPrettyPrinting()
-                .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
-                .create();
-        System.out.println(gson.toJson(projectSettings));
+        ProjectSettings projectSettings = ProjectSettings.fromSource(sourceExtractor, source);
+        System.out.println(ProjectSettings.toJSON(projectSettings));
     }
 }

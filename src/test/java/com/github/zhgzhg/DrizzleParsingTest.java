@@ -1,6 +1,7 @@
 package com.github.zhgzhg;
 
-import com.github.zhgzhg.drizzle.DrizzleCLI;
+import com.github.zhgzhg.drizzle.utils.json.BoardSettingsSerializerCustomizer;
+import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
 import com.google.gson.Gson;
@@ -61,13 +62,13 @@ public class DrizzleParsingTest {
         }
     }
 
-    private static DrizzleCLI.ProjectSettings createProjectSettings(SourceExtractor sourceExtractor, String source) {
+    private static ProjectSettings createProjectSettings(SourceExtractor sourceExtractor, String source) {
         SourceExtractor.BoardManager boardManager = sourceExtractor.dependentBoardManagerFromMainSketchSource(source);
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
         Map<String, String> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
 
-        DrizzleCLI.ProjectSettings projectSettings = new DrizzleCLI.ProjectSettings();
+        ProjectSettings projectSettings = new ProjectSettings();
         projectSettings.setBoardManager(boardManager);
         projectSettings.setBoard(board);
         projectSettings.setBoardSettings(boardSettings);
@@ -81,11 +82,11 @@ public class DrizzleParsingTest {
         String source2 = loadWholeTextResource("sample_sketch2.ino");
         SourceExtractor sourceExtractor = new SourceExtractor(strictLogProxy);
 
-        DrizzleCLI.ProjectSettings projectSettings = createProjectSettings(sourceExtractor, source);
-        DrizzleCLI.ProjectSettings projectSettings2 = createProjectSettings(sourceExtractor, source2);
+        ProjectSettings projectSettings = createProjectSettings(sourceExtractor, source);
+        ProjectSettings projectSettings2 = createProjectSettings(sourceExtractor, source2);
 
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().serializeNulls()
-                .registerTypeAdapter(SourceExtractor.BoardSettings.class, new DrizzleCLI.BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
                 .create();
 
         assertEquals(loadWholeTextResource("sample_sketch_parsed.json"), gson.toJson(projectSettings));
@@ -95,12 +96,12 @@ public class DrizzleParsingTest {
     @Test
     public void jsonParserTest() throws IOException {
         Gson gson = new GsonBuilder()
-                .registerTypeAdapter(SourceExtractor.BoardSettings.class, new DrizzleCLI.BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
                 .create();
 
         String json = loadWholeTextResource("sample_sketch_parsed.json");
-        DrizzleCLI.ProjectSettings projSettings = gson.fromJson(json, DrizzleCLI.ProjectSettings.class);
-        DrizzleCLI.ProjectSettings projSettingsTemplate = createProjectSettings(
+        ProjectSettings projSettings = gson.fromJson(json, ProjectSettings.class);
+        ProjectSettings projSettingsTemplate = createProjectSettings(
                 new SourceExtractor(this.strictLogProxy), loadWholeTextResource("sample_sketch.ino"));
 
         assertEquals(projSettingsTemplate.getBoardManager().toString(), projSettings.getBoardManager().toString());
@@ -109,7 +110,7 @@ public class DrizzleParsingTest {
         assertEquals(projSettingsTemplate.getLibraries().toString(), projSettings.getLibraries().toString());
 
         json = loadWholeTextResource("sample_sketch_parsed2.json");
-        projSettings = gson.fromJson(json, DrizzleCLI.ProjectSettings.class);
+        projSettings = gson.fromJson(json, ProjectSettings.class);
         projSettingsTemplate = createProjectSettings(
                 new SourceExtractor(this.strictLogProxy), loadWholeTextResource("sample_sketch2.ino"));
 
