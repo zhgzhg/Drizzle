@@ -80,7 +80,7 @@ public class UpdateUtils {
 
     public static NotificationPopup createNewVersionPopupNotification(Editor ed, LogProxy logProxy) {
         boolean isAccessible = PreferencesData.getBoolean("ide.accessible");
-        String newVersionOfDrizzle = "A new version of <a href=\"" + webLatestReleaseUrl() + "\"> the Drizzle Tool is available</a>";
+        String newVersionOfDrizzle = "A newer version of <a href=\"" + webLatestReleaseUrl() + "\"> the Drizzle Tool is available</a>";
 
         HyperlinkListener hyperlinkListener = hyperlinkEvent -> {
             if (hyperlinkEvent.getEventType() != HyperlinkEvent.EventType.ACTIVATED) return;
