@@ -504,7 +504,7 @@ public class Drizzle implements Tool {
                 this.logProxy.cliErrorln(e);
             }
 
-            delayedFileRemoval(2000, tempFile);
+            delayedFileRemoval(30000, tempFile);
 
             return true;
         }
