@@ -1,8 +1,13 @@
 .idea/
 arduino-*/
 target/
+gen/
+node_modules/
+package-lock.json
+package.json
 *.iml
 pom.xml.releaseBackup
 release.properties
 .mvn/wrapper/maven-wrapper.jar
 images/
+TODO.txt
