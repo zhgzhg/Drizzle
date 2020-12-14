@@ -4,17 +4,30 @@ Drizzle
 
 A lightweight dependency helper tool for Arduino IDE.
 
-By clicking on "Tools / Apply Drizzle @ Markers" Drizzle will download the libraries, platform, set the board, and its specific
-settings, __all described into the comments of your sketch file or in a separate JSON one__.
+Installs libraries, platforms, boards, and picks board-specific settings with a single click. __The preferences are described into the
+comments of the sketch file or in a separate JSON one__. Switching between Arduino projects with different settings or compiling them on
+different environments has never been easier!  
 
 Drizzle operates on top of Arduino IDE's library and board manager. It enables them to provide components, which now can be described in
-text form. Because the only change in the sketch is the addition of a few comments or editing a separate JSON file, the project will remain
-compatible with other Arduino IDEs that don't have Drizzle installed.
+text form. Because the only change in the sketch is the addition of a few _comments_ or editing _a separate JSON file_, the project will
+remain compatible with other Arduino IDEs that don't have Drizzle installed.
 
 ![Build Fat Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Fat%20Jar/badge.svg)
 
 How to Use
 ----------
+
+1. Create a comment inside the main file of your Arduino sketch (preferably at the beginning)
+
+2. Use markers like `@DependsOn`, `@BoardManager`, `@BoardSettings`, and `@Board` to describe the sketch's requirements
+   
+   1. You may click on __Tools / Auto-generate @Board* Markers__ or __Tools / Auto-generate @Board* And @Dependency Markers__ to let Drizzle
+   fill them as a C-style comment at the beginning of your main sketch file, based on IDE's current settings
+
+3. Save your sketch
+
+
+An example:
 
 ```
 /*
@@ -45,20 +58,18 @@ void loop() {
   delay(1000);
 }
 ```
-Create a comment inside the main file of your Arduino sketch. Preferably at the beginning.
+Like that the code self-explains its dependencies, so anyone interested in compiling it can do that with 2 clicks:
 
-Use markers like "@DependsOn", "@BoardManager", "@BoardSettings", and "@Board" to describe the sketch's requirements.
-Like that the code self-explains its dependencies, so anyone interested in compiling it can do that with 2 clicks.
-
-By clicking on "Tools / Auto-generate @Board* Markers" Drizzle will generate "@Board*" markers by looking into the currently
-selected board settings. The text will be inserted as a C-style comment at the beginning of your main sketch file. 
+* __Tools / Apply Drizzle @ Markers__ menu
+* __Verify / Upload__ button
 
 Using and combining Drizzle's markers is always optional.
+
 
 Alternative Usage
 -----------------
 
-Alternative to using the Arduino's main sketch file comments to describe dependencies and settings can be the "drizzle.json" file next
+Alternative to using the Arduino's main sketch file comments to describe dependencies and settings can be the __drizzle.json__ file next
 to it. In this case __drizzle.json__ will be the only source of settings and any Drizzle markers found in the source code will be ignored.
 
 An example for __drizzle.json__ can read in the [CLI Extras](#cli-extras) section.
@@ -70,6 +81,7 @@ How To Install
 1. Download the "-dist" ZIP file from the [Releases](https://github.com/zhgzhg/Drizzle/releases).
 2. Unzip it inside **Arduino's installation directory** / **tools**
 3. Restart Arduino IDE
+
 
 Supported Markers
 -----------------
@@ -132,7 +144,7 @@ CLI Extras
 Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
 from JSON file Drizzle markers will be produced is also supported.
 
-For e.g. `java -jar drizzle-0.9.1.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.10.0.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -172,7 +184,7 @@ For e.g. `java -jar drizzle-0.9.1.jar --parse hello-world.ino` will produce:
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.9.1.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.10.0.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
