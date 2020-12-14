@@ -78,7 +78,7 @@ An example for __drizzle.json__ can read in the [CLI Extras](#cli-extras) sectio
 How To Install
 --------------
 
-1. Download the "-dist" ZIP file from the [Releases](https://github.com/zhgzhg/Drizzle/releases).
+1. Download the "-dist" ZIP file from the [Releases](https://github.com/zhgzhg/Drizzle/releases)' assets.
 2. Unzip it inside **Arduino's installation directory** / **tools**
 3. Restart Arduino IDE
 
