@@ -117,7 +117,7 @@ public class Drizzle implements Tool {
 
                         insertCommentBlockWithMarkersAtStartOfTheCurrentTab(boardAndSettingsMarkers);
 
-                        logProxy.cliInfo("Marker generation is done!");
+                        logProxy.cliInfoln("%nMarker generation is done! Don't forget to save your sketch.");
                     }).start();
                 }
             }
@@ -127,7 +127,7 @@ public class Drizzle implements Tool {
             public void actionPerformed(final ActionEvent e) {
                 if (getPrimarySketchTabIfOpened() != null) {
                     insertCommentBlockWithMarkersAtStartOfTheCurrentTab(autogenBoardAndBoardSettingsMarkers(e));
-                    logProxy.cliInfo("Marker generation is done!");
+                    logProxy.cliInfoln("%nMarker generation is done! Don't forget to save your sketch.");
                 }
             }
         });
@@ -200,12 +200,12 @@ public class Drizzle implements Tool {
             }
 
             if (selectBoardOptions() == 0) {
-                this.logProxy.cliInfo("No clickable board options specified with " + SourceExtractor.BOARDSETTINGS_MARKER
+                this.logProxy.cliInfoln("No clickable board options specified with " + SourceExtractor.BOARDSETTINGS_MARKER
                         + " marker were matched");
             }
 
             drizzleMenu.ifPresent(dm -> dm.setEnabled(true));
-            this.logProxy.cliInfo("Done!");
+            this.logProxy.cliInfoln("Done!");
         }).start();
     }
 
