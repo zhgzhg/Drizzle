@@ -3,13 +3,14 @@ package com.github.zhgzhg.drizzle;
 import cc.arduino.contributions.GPGDetachedSignatureVerifier;
 import cc.arduino.contributions.ProgressListener;
 import cc.arduino.contributions.libraries.ContributedLibrary;
-import cc.arduino.contributions.libraries.LibrariesIndex;
 import cc.arduino.contributions.libraries.LibraryInstaller;
 import cc.arduino.contributions.packages.ContributedPackage;
 import cc.arduino.contributions.packages.ContributedPlatform;
 import cc.arduino.contributions.packages.ContributionInstaller;
 import cc.arduino.view.NotificationPopup;
 import com.github.gundy.semver4j.SemVer;
+import com.github.gundy.semver4j.model.Version;
+import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
@@ -23,6 +24,7 @@ import processing.app.Editor;
 import processing.app.EditorTab;
 import processing.app.PreferencesData;
 import processing.app.SketchFile;
+import processing.app.debug.RunnerException;
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
 import processing.app.debug.TargetPlatform;
@@ -45,18 +47,23 @@ import java.nio.channels.ReadableByteChannel;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
     public static final String MENU_TITLE = "Apply Drizzle @ Markers";
-    public static final String MENU_AUTOGEN_TITLE = "Auto-generate @Board* Markers";
+    public static final String METU_AUTOGEN_ALL_MARKERS_TITLE = "Auto-generate @Board* and @Dependency Markers (via compilation)";
+    public static final String MENU_AUTOGEN_BOARD_MARKERS_TITLE = "Auto-generate @Board* Markers";
 
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
@@ -69,7 +76,8 @@ public class Drizzle implements Tool {
     private LogProxy logProxy;
     private UILocator uiLocator;
 
-    private JMenuItem boardAndSettingsGeneratorMenu = new JMenuItem(MENU_AUTOGEN_TITLE);
+    private JMenuItem boardSettingsAndDependenciesGeneratorMenu = new JMenuItem(METU_AUTOGEN_ALL_MARKERS_TITLE);
+    private JMenuItem boardAndSettingsGeneratorMenu = new JMenuItem(MENU_AUTOGEN_BOARD_MARKERS_TITLE);
 
     @Override
     public void init(final Editor editor) {
@@ -96,10 +104,31 @@ public class Drizzle implements Tool {
         this.contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
         this.libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
 
+        this.boardSettingsAndDependenciesGeneratorMenu.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                if (getPrimarySketchTabIfOpened() != null) {
+                    new Thread(() -> {
+                        List<String> dependencyMarkers = autogenDependencyMarkers(e);
+                        List<String> boardAndSettingsMarkers = autogenBoardAndBoardSettingsMarkers(e);
+
+                        boardAndSettingsMarkers.add("");
+                        boardAndSettingsMarkers.addAll(dependencyMarkers);
+
+                        insertCommentBlockWithMarkersAtStartOfTheCurrentTab(boardAndSettingsMarkers);
+
+                        logProxy.cliInfo("Marker generation is done!");
+                    }).start();
+                }
+            }
+        });
         this.boardAndSettingsGeneratorMenu.addActionListener(new AbstractAction() {
             @Override
             public void actionPerformed(final ActionEvent e) {
-                autogenBoardAndBoardSettingsMarkers(e);
+                if (getPrimarySketchTabIfOpened() != null) {
+                    insertCommentBlockWithMarkersAtStartOfTheCurrentTab(autogenBoardAndBoardSettingsMarkers(e));
+                    logProxy.cliInfo("Marker generation is done!");
+                }
             }
         });
 
@@ -118,6 +147,7 @@ public class Drizzle implements Tool {
                         .ifPresent(m -> {
                             int index = m.getComponentIndex(drizzleMenu.get());
                             m.add(boardAndSettingsGeneratorMenu, index);
+                            m.add(boardSettingsAndDependenciesGeneratorMenu, index + 1);
                             m.revalidate();
                             editor.removeComponentListener(this);
                         });
@@ -175,6 +205,7 @@ public class Drizzle implements Tool {
             }
 
             drizzleMenu.ifPresent(dm -> dm.setEnabled(true));
+            this.logProxy.cliInfo("Done!");
         }).start();
     }
 
@@ -414,6 +445,13 @@ public class Drizzle implements Tool {
 
             List<ContributedLibrary> installCandidates =
                     availableLibraries.stream().filter(lib -> libName.equals(lib.getName())).collect(Collectors.toList());
+
+            if (installCandidates.isEmpty() && libName.contains("_")) {
+                String libNameWithSpaces = libName.replaceAll("_", " ");
+                installCandidates = availableLibraries.stream()
+                        .filter(lib -> libNameWithSpaces.equals(lib.getName())).collect(Collectors.toList());
+            }
+
             List<String> installCandidateVersions =
                     installCandidates.stream().map(ContributedLibrary::getParsedVersion).collect(Collectors.toList());
 
@@ -431,7 +469,11 @@ public class Drizzle implements Tool {
                 this.logProxy.cliInfo("Picked library version %s%n", l.getParsedVersion());
                 librariesToInstall.add(l);
             } else {
-                this.logProxy.cliError("Failed to pick version for library %s, expression %s%n", libName, libVer);
+                if (BaseNoGui.librariesIndexer.getInstalledLibraries().getByName(libName) == null) {
+                    this.logProxy.cliError("Failed to pick version for library %s, expression %s%n", libName, libVer);
+                } else {
+                    this.logProxy.cliInfo("Picked core library %s%n", libName);
+                }
             }
         }
 
@@ -454,7 +496,7 @@ public class Drizzle implements Tool {
     }
 
     private boolean installLibraryFromURI(String libUri) {
-        if ("*".equals(libUri)) return false;
+        if (libUri == null || "*".equals(libUri) || !libUri.contains("://")) return false;
 
         URL url;
         URI uri;
@@ -604,23 +646,54 @@ public class Drizzle implements Tool {
     }
 
     private String makeAutogenHeadingText() {
-        return String.format("/**%n * Automatically generated markers by Drizzle %s dependency helper tool, based on the selected"
-                + "%n * at that moment board options in Arduino IDE's UI. To apply them make sure this file is saved, then click on"
-                + "%n * Tools / %s. To obtain Drizzle visit: %s"
-                + "%n *", UpdateUtils.version(), MENU_TITLE, UpdateUtils.webUrl());
+        return String.format("/**\n * Automatically generated markers by Drizzle %s dependency helper tool, based on the selected"
+                + "\n * at that moment board options in Arduino IDE's UI. To apply them make sure this file is saved, then click on"
+                + "\n * Tools / %s. To obtain Drizzle visit: %s"
+                + "\n *", UpdateUtils.version(), MENU_TITLE, UpdateUtils.webUrl());
     }
 
-    private void autogenBoardAndBoardSettingsMarkers(final ActionEvent e) {
-        // a semi-naive implementation that should do the job for now
+    private List<String> autogenDependencyMarkers(final ActionEvent e) {
+        final Map<String, String> libs = new HashMap<>();
+        Pattern libsPattern = Pattern.compile(".*-> candidates: \\[([^\\]]+)\\].*");
 
-        SketchFile primarySketch = this.editor.getSketch().getPrimaryFile();
-        EditorTab currentTab = this.editor.getCurrentTab();
-        if (currentTab.getSketchFile() != primarySketch) {
-            this.logProxy.uiError("To generate Drizzle markers select the %s tab", primarySketch.getPrettyName());
-            return;
+        try {
+            new CompilationInvoker(editor, logProxy, msg -> {
+                Matcher matcher = libsPattern.matcher(msg);
+
+                if (matcher.matches()) {
+                    Stream.of(matcher.group(1).split(" "))
+                            .map(libName -> TextUtils.ltrim(libName, "["))
+                            .map(libName -> TextUtils.rtrim(libName, "]"))
+                            .sorted((lib1, lib2) -> {
+                                String v1 = TextUtils.extractIf(lib1.split("@", 2), 1, TextUtils::isNotNullOrBlank, "*");
+                                String v2 = TextUtils.extractIf(lib2.split("@", 2), 1, TextUtils::isNotNullOrBlank, "*");
+                                return -Version.fromString(v1).compareTo(Version.fromString(v2));
+                            })
+                            .findFirst()
+                            .ifPresent(lib -> {
+                                String[] nameAndVersion = lib.split("@", 2);
+                                String ver = TextUtils.extractIf(nameAndVersion, 1, TextUtils::isNotNullOrBlank, "*");
+                                if (!"*".equals(ver)) {
+                                    ver = "^" + TextUtils.trim(ver, " ");
+                                }
+                                libs.put(TextUtils.trim(nameAndVersion[0], " "), ver);
+                            });
+                }
+            }).compile();
+        } catch (RunnerException runnerException) {
+            logProxy.cliError(runnerException.getMessage());
         }
 
-        String combinedMarkers = "";
+        return libs.entrySet()
+                .stream()
+                .map(entry -> String.format("%s %s::%s", SourceExtractor.DEPENDSON_MARKER, entry.getKey(), entry.getValue()))
+                .collect(Collectors.toList());
+    }
+
+    private List<String> autogenBoardAndBoardSettingsMarkers(final ActionEvent e) {
+        // a semi-naive implementation that should do the job for now
+
+        List<String> result = new ArrayList<>();
 
         JMenu boardMenu = this.uiLocator.boardsMenu().orElse(null);
 
@@ -642,11 +715,10 @@ public class Drizzle implements Tool {
         String platformName = PreferencesData.get("target_platform", null);
         String boardName = TextUtils.unquotedValueFromLabelPair(boardMenu != null ? boardMenu.getText() : null);
 
-        String board = "";
-
         if (TextUtils.isNotNullOrBlank(boardName) && TextUtils.isNotNullOrBlank(platformName)) {
-            board = String.format("%s %s%s::%s", SourceExtractor.BOARDNAME_MARKER,
+            String board = String.format("%s %s%s::%s", SourceExtractor.BOARDNAME_MARKER,
                     (TextUtils.isNullOrBlank(providerPackageName) ? "" : providerPackageName + "::"), platformName, boardName);
+            result.add(board);
         } else {
             this.logProxy.cliError("Cannot automatically generate %s marker%n", SourceExtractor.BOARDNAME_MARKER);
         }
@@ -657,6 +729,7 @@ public class Drizzle implements Tool {
                     (TextUtils.isNullOrBlank(boardName) ? "*" : boardName),
                     boardSettings
             );
+            result.add(boardSettings);
         } else {
             this.logProxy.cliWarn("No suitable clickable menus found for %s marker%n", SourceExtractor.BOARD_SETTINGS);
         }
@@ -673,6 +746,7 @@ public class Drizzle implements Tool {
             if (!possiblePlatforms.isEmpty()) {
                 String s = SemVer.maxSatisfying(possiblePlatforms.keySet(), "*");
                 boardManager = String.format("%s %s::%s", SourceExtractor.BOARDMANAGER_MARKER, platformName, s);
+                result.add(boardManager);
             }
         }
 
@@ -680,13 +754,30 @@ public class Drizzle implements Tool {
             this.logProxy.cliInfo("Skipped the generation of %s marker", SourceExtractor.BOARDMANAGER_MARKER);
         }
 
-        if (TextUtils.anyNotNullOrBlank(boardManager, board, boardSettings)) {
-            String comment = TextUtils.concatenate(TextUtils::isNotNullOrBlank, s -> String.format("%n * %s", s), boardManager, board,
-                    boardSettings);
+        return result;
+    }
+
+    private EditorTab getPrimarySketchTabIfOpened() {
+        SketchFile primarySketch = this.editor.getSketch().getPrimaryFile();
+        EditorTab currentTab = this.editor.getCurrentTab();
+        if (currentTab.getSketchFile() != primarySketch) {
+            this.logProxy.uiError("To generate Drizzle markers select the %s tab", primarySketch.getPrettyName());
+            return null;
+        }
+        return currentTab;
+    }
+
+    private void insertCommentBlockWithMarkersAtStartOfTheCurrentTab(List<String> commentLines) {
+        if (!commentLines.isEmpty()) {
+            EditorTab currentTab = getPrimarySketchTabIfOpened();
+            if (currentTab == null) return;
+
+            String comment = TextUtils.concatenate(TextUtils::isNotNullOrBlank, s -> String.format("\n * %s", s),
+                    commentLines.toArray(new String[commentLines.size()]));
 
             StringBuilder sb = new StringBuilder(makeAutogenHeadingText())
                     .append(comment)
-                    .append(String.format("%n */%n%n"))
+                    .append(String.format("\n */\n\n"))
                     .append(currentTab.getText());
 
             currentTab.setScrollPosition(0);
