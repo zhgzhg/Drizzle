@@ -2,6 +2,7 @@ package com.github.zhgzhg.drizzle.utils.text;
 
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
+import java.util.regex.Pattern;
 
 public class TextUtils {
     private TextUtils() { }
@@ -80,5 +81,27 @@ public class TextUtils {
         }
 
         return sb.toString();
+    }
+
+    public static String extractIf(String[] from, int index, Predicate<String> condition, String alternative) {
+        if (from != null && from.length > index && condition.test(from[index])) {
+            return from[index];
+        }
+
+        return alternative;
+    }
+
+    public static String ltrim(String str, String characters) {
+        if (str == null || str.isEmpty() || characters == null || characters.isEmpty()) return str;
+        return Pattern.compile("^" + Pattern.quote(characters)).matcher(str).replaceAll("");
+    }
+
+    public static String rtrim(String str, String characters) {
+        if (str == null || str.isEmpty() || characters == null || characters.isEmpty()) return str;
+        return Pattern.compile(Pattern.quote(characters) + "$").matcher(str).replaceAll("");
+    }
+
+    public static String trim(String str, String characters) {
+        return rtrim(ltrim(str, characters), characters);
     }
 }
