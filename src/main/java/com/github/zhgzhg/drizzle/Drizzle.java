@@ -761,7 +761,7 @@ public class Drizzle implements Tool {
         SketchFile primarySketch = this.editor.getSketch().getPrimaryFile();
         EditorTab currentTab = this.editor.getCurrentTab();
         if (currentTab.getSketchFile() != primarySketch) {
-            this.logProxy.uiError("To generate Drizzle markers select the %s tab%n", primarySketch.getPrettyName());
+            this.logProxy.uiError("To generate Drizzle markers select the %s tab", primarySketch.getPrettyName());
             return null;
         }
         return currentTab;
