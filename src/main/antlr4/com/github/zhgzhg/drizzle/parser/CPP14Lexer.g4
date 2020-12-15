@@ -1,7 +1,8 @@
 /**
  * Slightly modified, the original is obtained from:
- * https://raw.githubusercontent.com/antlr/grammars-v4/defb75535fdd2c956f7184192d67aae1dea61a4d/cpp/CPP14Lexer.g4
+ * https://raw.githubusercontent.com/antlr/grammars-v4/f20066f6b2d55d14d4dc22cac61e555a2563e8d3/cpp/CPP14Lexer.g4
  */
+
 lexer grammar CPP14Lexer;
 
 @lexer::members {
@@ -9,14 +10,32 @@ lexer grammar CPP14Lexer;
     public static final int COMMENTS = 2;
 }
 
-Literal:
-	IntegerLiteral
-	| CharacterLiteral
-	| FloatingLiteral
-	| StringLiteral
-	| BooleanLiteral
-	| PointerLiteral
-	| UserDefinedLiteral;
+IntegerLiteral:
+	DecimalLiteral Integersuffix?
+	| OctalLiteral Integersuffix?
+	| HexadecimalLiteral Integersuffix?
+	| BinaryLiteral Integersuffix?;
+
+CharacterLiteral:
+	('u' | 'U' | 'L')? '\'' Cchar+ '\'';
+
+FloatingLiteral:
+	Fractionalconstant Exponentpart? Floatingsuffix?
+	| Digitsequence Exponentpart Floatingsuffix?;
+
+StringLiteral:
+	Encodingprefix? '"' Schar* '"'
+	| Encodingprefix? 'R' Rawstring;
+
+BooleanLiteral: False_ | True_;
+
+PointerLiteral: Nullptr;
+
+UserDefinedLiteral:
+	UserDefinedIntegerLiteral
+	| UserDefinedFloatingLiteral
+	| UserDefinedStringLiteral
+	| UserDefinedCharacterLiteral;
 
 MultiLineMacro:
 	'#' (~[\n]*? '\\' '\r'? '\n')+ ~ [\n]+ -> channel (HIDDEN);
@@ -231,10 +250,6 @@ AndAssign: '&=';
 
 OrAssign: '|=';
 
-LeftShift: '<<';
-
-RightShift: '>>';
-
 LeftShiftAssign: '<<=';
 
 RightShiftAssign: '>>=';
@@ -294,12 +309,6 @@ fragment NONDIGIT: [a-zA-Z_];
 
 fragment DIGIT: [0-9];
 
-IntegerLiteral:
-	DecimalLiteral Integersuffix?
-	| OctalLiteral Integersuffix?
-	| HexadecimalLiteral Integersuffix?
-	| BinaryLiteral Integersuffix?;
-
 DecimalLiteral: NONZERODIGIT ('\''? DIGIT)*;
 
 OctalLiteral: '0' ('\''? OCTALDIGIT)*;
@@ -330,12 +339,6 @@ fragment Longsuffix: [lL];
 
 fragment Longlongsuffix: 'll' | 'LL';
 
-CharacterLiteral:
-	'\'' Cchar+ '\''
-	| 'u' '\'' Cchar+ '\''
-	| 'U' '\'' Cchar+ '\''
-	| 'L' '\'' Cchar+ '\'';
-
 fragment Cchar:
 	~ ['\\\r\n]
 	| Escapesequence
@@ -356,6 +359,7 @@ fragment Simpleescapesequence:
 	| '\\f'
 	| '\\n'
 	| '\\r'
+	| ('\\' ('\r' '\n'? | '\n'))
 	| '\\t'
 	| '\\v';
 
@@ -365,10 +369,6 @@ fragment Octalescapesequence:
 	| '\\' OCTALDIGIT OCTALDIGIT OCTALDIGIT;
 
 fragment Hexadecimalescapesequence: '\\x' HEXADECIMALDIGIT+;
-
-FloatingLiteral:
-	Fractionalconstant Exponentpart? Floatingsuffix?
-	| Digitsequence Exponentpart Floatingsuffix?;
 
 fragment Fractionalconstant:
 	Digitsequence? '.' Digitsequence
@@ -384,9 +384,6 @@ fragment Digitsequence: DIGIT ('\''? DIGIT)*;
 
 fragment Floatingsuffix: [flFL];
 
-StringLiteral:
-	Encodingprefix? '"' Schar* '"'
-	| Encodingprefix? 'R' Rawstring;
 fragment Encodingprefix: 'u8' | 'u' | 'U' | 'L';
 
 fragment Schar:
@@ -394,17 +391,7 @@ fragment Schar:
 	| Escapesequence
 	| Universalcharactername;
 
-fragment Rawstring: '"' .*? '(' .*? ')' .*? '"';
-
-BooleanLiteral: False_ | True_;
-
-PointerLiteral: Nullptr;
-
-UserDefinedLiteral:
-	UserDefinedIntegerLiteral
-	| UserDefinedFloatingLiteral
-	| UserDefinedStringLiteral
-	| UserDefinedCharacterLiteral;
+fragment Rawstring: '"' ~[\r\n(]* '(' ~[\r\n)]* ')' ~[\r\n"]* '"';
 
 UserDefinedIntegerLiteral:
 	DecimalLiteral Udsuffix
