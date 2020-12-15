@@ -21,8 +21,8 @@ How to Use
 
 2. Use markers like `@DependsOn`, `@BoardManager`, `@BoardSettings`, and `@Board` to describe the sketch's requirements
    
-   1. You may click on __Tools / Auto-generate @Board* Markers__ or __Tools / Auto-generate @Board* And @Dependency Markers__ to let Drizzle
-   fill them as a C-style comment at the beginning of your main sketch file, based on IDE's current settings
+   1. You may use some of __Tools / Auto-generate ...__ marker options to let Drizzle fill them as a C-style comment at the beginning of
+   your main sketch file, based on IDE's current settings. Depending on the environment the result might require modifications.
 
 3. Save your sketch
 
