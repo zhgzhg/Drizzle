@@ -22,12 +22,12 @@
         <connection>scm:git:git@github.com:zhgzhg/drizzle.git</connection>
         <developerConnection>scm:git:git@github.com:zhgzhg/drizzle.git</developerConnection>
         <url>https://github.com/zhgzhg/drizzle</url>
-        <tag>0.10.1</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <groupId>com.github.zhgzhg</groupId>
     <artifactId>drizzle</artifactId>
-    <version>0.10.1</version>
+    <version>0.10.2-SNAPSHOT</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
