@@ -117,7 +117,7 @@ public class Drizzle implements Tool {
 
                         insertCommentBlockWithMarkersAtStartOfTheCurrentTab(boardAndSettingsMarkers);
 
-                        logProxy.cliInfoln("%nMarker generation is done! Don't forget to save your sketch.");
+                        logProxy.cliInfoln("Marker generation is done! Don't forget to save your sketch.");
                     }).start();
                 }
             }
@@ -127,7 +127,7 @@ public class Drizzle implements Tool {
             public void actionPerformed(final ActionEvent e) {
                 if (getPrimarySketchTabIfOpened() != null) {
                     insertCommentBlockWithMarkersAtStartOfTheCurrentTab(autogenBoardAndBoardSettingsMarkers(e));
-                    logProxy.cliInfoln("%nMarker generation is done! Don't forget to save your sketch.");
+                    logProxy.cliInfoln("Marker generation is done! Don't forget to save your sketch.");
                 }
             }
         });
@@ -751,7 +751,7 @@ public class Drizzle implements Tool {
         }
 
         if (TextUtils.isNullOrBlank(boardManager)) {
-            this.logProxy.cliInfo("Skipped the generation of %s marker", SourceExtractor.BOARDMANAGER_MARKER);
+            this.logProxy.cliInfo("Skipped the generation of %s marker%n", SourceExtractor.BOARDMANAGER_MARKER);
         }
 
         return result;
@@ -761,7 +761,7 @@ public class Drizzle implements Tool {
         SketchFile primarySketch = this.editor.getSketch().getPrimaryFile();
         EditorTab currentTab = this.editor.getCurrentTab();
         if (currentTab.getSketchFile() != primarySketch) {
-            this.logProxy.uiError("To generate Drizzle markers select the %s tab", primarySketch.getPrettyName());
+            this.logProxy.uiError("To generate Drizzle markers select the %s tab%n", primarySketch.getPrettyName());
             return null;
         }
         return currentTab;
