@@ -168,6 +168,8 @@ public class Drizzle implements Tool {
                     if (installedToolsCount > 0) {
                         logProxy.cliInfoln("Please restart the IDE in order to load the newly installed tools.");
                     }
+
+                    logProxy.cliInfo("Finished installing Arduino IDE tools.");
                 }).start();
             }
         });
