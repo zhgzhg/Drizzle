@@ -1,30 +1,35 @@
 Drizzle
 =======
-<img alt="Drizzle Logo" src="https://raw.githubusercontent.com/zhgzhg/Drizzle/master/drizzle-logo.svg?sanitize=true" />
+A lightweight dependency manager helper tool for Arduino IDE.
 
-A lightweight dependency helper tool for Arduino IDE.
+<img alt="Drizzle" src="https://raw.githubusercontent.com/zhgzhg/Drizzle/master/drizzle-logo.svg?sanitize=true" />
 
-Installs libraries, platforms, boards, and picks board-specific settings with a single click. __The preferences are described into the
-comments of the sketch file or in a separate JSON one__. Switching between Arduino projects with different settings or compiling them on
-different environments has never been easier!  
+Drizzle installs libraries, platforms, boards, picks board-specific settings, and even installs other Arduino IDE tools with a single click.
+__The preferences are described into the sketch's comments or in a separate JSON file__. Switching between Arduino projects with different
+settings or compiling them on different environments has never been easier! 
+
+![Build Distribution Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Fat%20Jar/badge.svg)
 
 Drizzle operates on top of Arduino IDE's library and board manager. It enables them to provide components, which now can be described in
-text form. Because the only change in the sketch is the addition of a few _comments_ or editing _a separate JSON file_, the project will
+text form. Because the only change in the sketch is the addition of a few _comments_ or editing _a separate JSON file_, the sketch will
 remain compatible with other Arduino IDEs that don't have Drizzle installed.
 
-![Build Fat Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Fat%20Jar/badge.svg)
 
 How to Use
 ----------
 
-1. Create a comment inside the main file of your Arduino sketch (preferably at the beginning)
+1. Create a comment inside the main file of your Arduino sketch (preferably at the beginning).
 
-2. Use markers like `@DependsOn`, `@BoardManager`, `@BoardSettings`, and `@Board` to describe the sketch's requirements
+2. Use markers like `@DependsOn`, `@BoardManager`, `@BoardSettings`, `@Board`, and `@ArduinoTool` to describe the sketch's requirements.
    
-   1. You may use some of __Tools / Auto-generate ... marker__ UI options to let Drizzle fill them as a C-style comment at the beginning of
-   your main sketch file, based on IDE's current settings. Depending on the environment the result might require adjustments.
+   1. You may use some of __Tools -> Drizzle -> Auto-generate ... marker__ UI options to let Drizzle fill them as a C-style comment at the
+      beginning of your main sketch file, based on IDE's current settings. Depending on the environment the result might require
+      adjustments.
 
-3. Save your sketch
+3. Save your sketch.
+
+
+<img alt="Drizzle Sample Usage GIF" src="https://raw.githubusercontent.com/zhgzhg/Drizzle/master/drizzle-sample-usage.gif" />
 
 
 An example:
@@ -43,6 +48,8 @@ An example:
  * @DependsOn Arduino_CRC32::1.0.0
  * @DependsOn Arduino Cloud Provider Examples::*
  * @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
+ *
+ * @ArduinoTool Drizzle::(<0.11.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.11.0/drizzle-0.11.0-dist.zip
  */
 
 // Your sample code follows below just as usual
@@ -60,7 +67,7 @@ void loop() {
 ```
 Like that the code self-explains its dependencies, so anyone interested in compiling it can do that with 2 clicks:
 
-* __Tools / Apply Drizzle @ Markers__ menu
+* __Tools -> Drizzle -> Apply Markers__ menu
 * __Verify / Upload__ button
 
 Using and combining Drizzle's markers is always optional.
@@ -108,7 +115,7 @@ Supported Markers
 * __@DependsOn__ _library_name_::(_library_version_ | _library_uri_)
   * Downloads libraries or installs local ones
   * __More__ than 1 marker can be used. 
-  * _library_name_ must be unique. In case of duplicated library names, the last one will be respected.
+  * _library_name_ must be unique. In case of duplicated library names, the first one will be respected.
   * The version can be either specified directly or via conditional expressions.
     * Full list of the supported expressions at: https://github.com/npm/node-semver#ranges
     * In case _library_uri_ is specified instead of _library_version_:
@@ -124,6 +131,7 @@ Supported Markers
     * `@DependsOn Local BMP280_DEV::file:///C:/Users/John/Desktop/BMP280_DEV_DIRECTORY`
     * `@DependsOn Github's BMP280_DEV::https://github.com/MartinL1/BMP280_DEV/archive/master.zip`
 
+
 * __@BoardSettings__ _platform_name_::_board_name_::_menu_path_[->_option_][||_another_menu_path_->option]
   * Clicks on the UI options provided by a particular board (and platform)
   * __More__ than 1 marker can be used.
@@ -138,13 +146,31 @@ Supported Markers
     * `@BoardSettings esp32::*::Flash Frequency->40MHz||PSRAM->Disabled`
     * `@BoardSettings *::*::Upload Speed->115200`
 
+
+* __@ArduinoTool__ _tool_name_::_version_::_tool_zip_url_
+  * Installs an Arduino tool from __ZIP__ archive into the IDE. The tool is unzipped inside Arduino IDE's installation directory / tools,
+    and will require restarting the IDE in order to be activated.
+  * This marker __works a bit different compared to _@DependsOn___. It performs __supervising work rather than actual dependency version
+    management__. It should be used with caution as it has the potential of installing unwanted software. 
+  * The _version_ __field serves as a condition__ when _tool_zip_url_ to be installed.
+  * Version information of the already installed tool is obtained from the meta information inside the JAR file. If it doesn't contain
+    _MANIFEST.MF_ or it's lacking an _Implementation-Version_ entry no actions will be taken. Otherwise, Drizzle will attempt installing the
+    tool from _tool_zip_url_.
+  * The _tool_name_ must match the name of the directory containing the actual tool. It has to be unique. In the case of several duplicating
+    names the first one will be respected.
+  * Examples:
+    * `@ArduinoTool Drizzle::(<0.11.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.11.0/drizzle-0.11.0-dist.zip`
+    * `@ArduinoTool Drizzle::*::file:///C:/Users/John/Drizzle/drizzle.zip`
+    * `@ArduinoTool EspExceptionDecoder::(<=1.0.0)::https://github.com/me-no-dev/EspExceptionDecoder/releases/download/1.1.0/EspExceptionDecoder-1.1.0.zip`
+
+
 CLI Extras
 ----------
 
 Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
 from JSON file Drizzle markers will be produced is also supported.
 
-For e.g. `java -jar drizzle-0.10.1.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.11.0.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -180,11 +206,17 @@ For e.g. `java -jar drizzle-0.10.1.jar --parse hello-world.ino` will produce:
     "BMP280_DEV": "(>= 1.0.8 && < 1.0.16)",
     "Arduino_CRC32": "1.0.0",
     "Arduino Cloud Provider Examples": "*"
+  },
+  "arduino_ide_tools": {
+    "Drizzle": {
+      "version": "(<0.11.0)",
+      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.11.0/drizzle-0.11.0-dist.zip"
+    }
   }
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.10.1.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.11.0.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
@@ -193,6 +225,7 @@ Executing on the above JSON `java -jar drizzle-0.10.1.jar --rev-parse hello-worl
 @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
+@ArduinoTool Drizzle::(<0.11.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.11.0/drizzle-0.11.0-dist.zip
 ```
 
 
