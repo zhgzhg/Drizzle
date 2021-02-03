@@ -21,7 +21,7 @@ jobs:
         with:
           java-version: 1.8
 
-      - name: Build Fat JAR
+      - name: Build Distribution JAR
         run: |
           chmod +x ./mvnw
           ./mvnw clean
@@ -44,7 +44,7 @@ jobs:
           echo '"}' >>package.json
 
       - name: Generate Changelog
-        uses: scottbrenner/generate-changelog-action@1.0.2
+        uses: scottbrenner/generate-changelog-action@1.0.3
         id: Changelog
         env:
           REPO: ${{ github.repository }}
