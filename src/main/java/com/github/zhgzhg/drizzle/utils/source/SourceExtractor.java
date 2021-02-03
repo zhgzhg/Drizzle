@@ -374,7 +374,6 @@ public class SourceExtractor {
                             && TextUtils.isNotNullOrBlank(at.url)
                             && null != TextUtils.toURL(at.url, ex -> logProxy.cliError("Invalid URL in comment %s %s::%s::%s - %s%n",
                                 ARDUINOTOOL_MARKER, at.name, at.version, at.url, ex.getMessage()))
-
                     )
                     .collect(Collectors.toList());
         } catch (IOException e) {

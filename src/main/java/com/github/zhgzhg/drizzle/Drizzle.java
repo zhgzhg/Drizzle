@@ -134,6 +134,7 @@ public class Drizzle implements Tool {
             @Override
             public void actionPerformed(final ActionEvent e) {
                 new Thread(() -> {
+                    logProxy.uiInfo("                                                                                                                                                                                                               ");
                     String source;
                     try {
                         source = SourceExtractor.loadSourceFromPrimarySketch(editor);
@@ -660,8 +661,8 @@ public class Drizzle implements Tool {
     private String makeAutogenHeadingText() {
         return String.format("/**\n * Automatically generated markers by Drizzle %s dependency helper tool, based on the selected"
                 + "\n * at that moment board options in Arduino IDE's UI. To apply them make sure this file is saved, then click on"
-                + "\n * Tools -> Drizzle -> %s. To obtain Drizzle visit: %s"
-                + "\n *", UpdateUtils.version(), MENU_TITLE, UpdateUtils.webUrl());
+                + "\n * Tools -> %s -> %s. To obtain Drizzle visit: %s"
+                + "\n *", UpdateUtils.version(), MENUS_HOLDER, MENU_TITLE, UpdateUtils.webUrl());
     }
 
     private List<String> autogenDependencyMarkers(final ActionEvent e) {
