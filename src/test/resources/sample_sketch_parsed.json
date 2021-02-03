@@ -31,5 +31,15 @@
     "BMP280_DEV": "(>= 1.0.8 && < 1.0.16)",
     "Arduino_CRC32": "1.0.0",
     "Arduino Cloud Provider Examples": "*"
+  },
+  "arduino_ide_tools": {
+    "Drizzle": {
+      "version": "(<=0.2)",
+      "url": "file:///somewhere.zip"
+    },
+    "Drizzl3": {
+      "version": "(<=0.3)",
+      "url": "file:///somewhere.zip"
+    }
   }
 }

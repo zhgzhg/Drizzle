@@ -1,11 +1,16 @@
 package com.github.zhgzhg.drizzle.utils.text;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
 
 public class TextUtils {
-    private TextUtils() { }
+    private TextUtils() {
+        throw new UnsupportedOperationException("Not intended for instantiation");
+    }
 
     public static boolean isNullOrBlank(String param) {
         return param == null || param.trim().length() == 0;
@@ -29,13 +34,13 @@ public class TextUtils {
         return !isNullOrBlank(param);
     }
 
-    public static boolean allNotNullOrBlank(String param, String... otherParams) {
+    public static boolean allNotBlank(String param, String... otherParams) {
         if (isNullOrBlank(param) || otherParams == null || otherParams.length == 0) return false;
 
         return !anyNullOrBlank(param, otherParams);
     }
 
-    public static boolean anyNotNullOrBlank(String param, String... otherParams) {
+    public static boolean anyNotBlank(String param, String... otherParams) {
         if (isNotNullOrBlank(param)) return true;
 
         if (otherParams != null && otherParams.length > 0) {
@@ -49,8 +54,22 @@ public class TextUtils {
         return false;
     }
 
+    public static String returnAnyNotBlank(String param, String... otherParams) {
+        if (isNotNullOrBlank(param)) return param;
+
+        if (otherParams != null && otherParams.length > 0) {
+            for (String op : otherParams) {
+                if (isNotNullOrBlank(op)) {
+                    return op;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public static String[] labelAndUnquotedValue(String param) {
-        if (isNullOrBlank(param)) return null;
+        if (isNullOrBlank(param)) return new String[0];
 
         String[] split = param.split(": ", 2);
         if (split.length == 2) {
@@ -66,7 +85,7 @@ public class TextUtils {
 
     public static String unquotedValueFromLabelPair(String param) {
         String[] res = labelAndUnquotedValue(param);
-        return (res == null || res.length != 2 ? null : res[1]);
+        return (res.length != 2 ? null : res[1]);
     }
 
     public static String concatenate(Predicate<String> filter, UnaryOperator<String> preparer, String... strings) {
@@ -103,5 +122,16 @@ public class TextUtils {
 
     public static String trim(String str, String characters) {
         return rtrim(ltrim(str, characters), characters);
+    }
+
+    public static URL toURL(String url, Consumer<MalformedURLException> onError) {
+        try {
+            return new URL(url);
+        } catch (MalformedURLException ex) {
+            if (onError != null) {
+                onError.accept(ex);
+            }
+        }
+        return null;
     }
 }

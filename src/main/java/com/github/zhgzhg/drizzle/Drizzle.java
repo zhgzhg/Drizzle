@@ -10,8 +10,10 @@ import cc.arduino.contributions.packages.ContributionInstaller;
 import cc.arduino.view.NotificationPopup;
 import com.github.gundy.semver4j.SemVer;
 import com.github.gundy.semver4j.model.Version;
+import com.github.zhgzhg.drizzle.utils.arduino.ArduinoIDEToolsInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
+import com.github.zhgzhg.drizzle.utils.file.FileUtils;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.log.ProgressPrinter;
@@ -36,15 +38,10 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.channels.Channels;
-import java.nio.channels.FileChannel;
-import java.nio.channels.ReadableByteChannel;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -52,7 +49,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -61,9 +57,11 @@ import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
-    public static final String MENU_TITLE = "Apply Drizzle @ Markers";
+    public static final String MENUS_HOLDER = "Drizzle";
+    public static final String MENU_TITLE = "Apply Markers";
     public static final String METU_AUTOGEN_ALL_MARKERS_TITLE = "Auto-generate @Board* and @Dependency Markers (via compilation)";
     public static final String MENU_AUTOGEN_BOARD_MARKERS_TITLE = "Auto-generate @Board* Markers";
+    public static final String MENU_ARDUINO_TOOL_INSTALL_TITLE = "Install tools marked with @ArduinoTool";
 
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
@@ -78,6 +76,7 @@ public class Drizzle implements Tool {
 
     private JMenuItem boardSettingsAndDependenciesGeneratorMenu = new JMenuItem(METU_AUTOGEN_ALL_MARKERS_TITLE);
     private JMenuItem boardAndSettingsGeneratorMenu = new JMenuItem(MENU_AUTOGEN_BOARD_MARKERS_TITLE);
+    private JMenuItem arduinoToolInstallMenu = new JMenuItem(MENU_ARDUINO_TOOL_INSTALL_TITLE);
 
     @Override
     public void init(final Editor editor) {
@@ -131,6 +130,46 @@ public class Drizzle implements Tool {
                 }
             }
         });
+        this.arduinoToolInstallMenu.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                new Thread(() -> {
+                    String source;
+                    try {
+                        source = SourceExtractor.loadSourceFromPrimarySketch(editor);
+                    } catch (IOException ex) {
+                        logProxy.cliErrorln(ex);
+                        logProxy.uiError(ex.getMessage());
+                        return;
+                    }
+
+                    SourceExtractor se = new SourceExtractor(editor, logProxy);
+                    List<SourceExtractor.ArduinoTool> arduinoTools = se.arduinoToolsFromMainSketchSource(source);
+
+                    ArduinoIDEToolsInstaller toolsInstaller = new ArduinoIDEToolsInstaller(logProxy);
+
+                    int installedToolsCount = 0;
+                    for (SourceExtractor.ArduinoTool at : arduinoTools) {
+                        String installedVer = toolsInstaller.extractInstalledToolVersion(at.name);
+                        if (installedVer == null || (!installedVer.isEmpty() && SemVer.satisfies(installedVer, at.version))) {
+                            logProxy.cliInfo("Installing %s from %s...%n", at.name, at.url);
+                            if (toolsInstaller.installTool(at.name, at.url)) {
+                                ++installedToolsCount;
+                                logProxy.cliInfo("Successfully installed %s!%n", at.name);
+                            } else {
+                                logProxy.cliError("Failed installing %s!%n", at.name);
+                            }
+                        } else {
+                            logProxy.cliInfo("Skipped the installation of %s.%n", at.name);
+                        }
+                    }
+
+                    if (installedToolsCount > 0) {
+                        logProxy.cliInfoln("Please restart the IDE in order to load the newly installed tools.");
+                    }
+                }).start();
+            }
+        });
 
         this.editor.addComponentListener(new ComponentAdapter() {
             @Override
@@ -146,8 +185,15 @@ public class Drizzle implements Tool {
                         })
                         .ifPresent(m -> {
                             int index = m.getComponentIndex(drizzleMenu.get());
-                            m.add(boardAndSettingsGeneratorMenu, index);
-                            m.add(boardSettingsAndDependenciesGeneratorMenu, index + 1);
+
+                            JMenu drizzleMenus = new JMenu(MENUS_HOLDER);
+                            drizzleMenus.add(drizzleMenu.get());
+                            drizzleMenus.add(boardAndSettingsGeneratorMenu);
+                            drizzleMenus.add(boardSettingsAndDependenciesGeneratorMenu);
+                            drizzleMenus.add(arduinoToolInstallMenu);
+
+                            m.remove(index);
+                            m.add(drizzleMenus, index);
                             m.revalidate();
                             editor.removeComponentListener(this);
                         });
@@ -447,7 +493,7 @@ public class Drizzle implements Tool {
                     availableLibraries.stream().filter(lib -> libName.equals(lib.getName())).collect(Collectors.toList());
 
             if (installCandidates.isEmpty() && libName.contains("_")) {
-                String libNameWithSpaces = libName.replaceAll("_", " ");
+                String libNameWithSpaces = libName.replace("_", " ");
                 installCandidates = availableLibraries.stream()
                         .filter(lib -> libNameWithSpaces.equals(lib.getName())).collect(Collectors.toList());
             }
@@ -513,40 +559,23 @@ public class Drizzle implements Tool {
 
         if (uri.getScheme().toLowerCase().startsWith("http")) {
             if (!uri.getPath().toLowerCase().endsWith(".zip")) {
-                this.logProxy.cliError("The extenal URL library must be a concrete ZIP file - '%s'! Skipping it!%n", libUri);
+                this.logProxy.cliError("The external URL library must be a concrete ZIP file - '%s'! Skipping it!%n", libUri);
                 return true;
             }
 
             this.logProxy.cliInfo("ZIP URI detected! Picked %s%n", libUri);
 
-            File tempFile;
-            try {
-                tempFile = Files.createTempFile("ard-drizzle-ext-lib", ".zip").toFile();
-                tempFile.deleteOnExit();
-            } catch (IOException e) {
-                this.logProxy.cliError("Failed creating temporary file for downloading the external library %s%n", libUri);
-                return true;
-            }
+            FileUtils fileUtils = new FileUtils(logProxy);
+            File tempFile = fileUtils.downloadZip(url, "-lib");
 
-            try (ReadableByteChannel readableByteChannel = Channels.newChannel(url.openStream());
-                    FileChannel fileOutputChannel = new FileOutputStream(tempFile).getChannel()) {
-
-                long bytesTransferred = fileOutputChannel.transferFrom(readableByteChannel, 0, Long.MAX_VALUE);
-                if (bytesTransferred < 1) {
-                    throw new IOException("File of 0 bytes size");
-                }
-
+            if (tempFile != null) {
                 ExternLibFileInstaller installer = new ExternLibFileInstaller(this.logProxy);
                 if (installer.installZipOrDirWithZips(tempFile)) {
                     installer.logSuccessfullyInstalledLib(libUri);
                 }
-
-            } catch (IOException e) {
-                this.logProxy.cliError("Failed transferring %s:%n", libUri);
-                this.logProxy.cliErrorln(e);
             }
 
-            delayedFileRemoval(30000, tempFile);
+            fileUtils.delayedFileRemoval(30000, tempFile);
 
             return true;
         }
@@ -560,23 +589,6 @@ public class Drizzle implements Tool {
         }
 
         return true;
-    }
-
-    private void delayedFileRemoval(long millis, File tempFile) {
-        new Thread(() -> {
-            try {
-                Thread.sleep(millis);
-            } catch (InterruptedException e) {
-                e.printStackTrace(this.logProxy.stderr());
-                Thread.currentThread().interrupt();
-            } finally {
-                try {
-                    Files.deleteIfExists(tempFile.toPath());
-                } catch (IOException e) {
-                    this.logProxy.cliErrorln(e);
-                }
-            }
-        }).start();
     }
 
     private int selectBoardOptions() {
@@ -648,7 +660,7 @@ public class Drizzle implements Tool {
     private String makeAutogenHeadingText() {
         return String.format("/**\n * Automatically generated markers by Drizzle %s dependency helper tool, based on the selected"
                 + "\n * at that moment board options in Arduino IDE's UI. To apply them make sure this file is saved, then click on"
-                + "\n * Tools / %s. To obtain Drizzle visit: %s"
+                + "\n * Tools -> Drizzle -> %s. To obtain Drizzle visit: %s"
                 + "\n *", UpdateUtils.version(), MENU_TITLE, UpdateUtils.webUrl());
     }
 
@@ -701,7 +713,7 @@ public class Drizzle implements Tool {
                 .filter(m -> m != boardMenu)
                 .map(m -> {
                     String[] labelAndValue = TextUtils.labelAndUnquotedValue(m.getText());
-                    if (labelAndValue == null) return null;
+                    if (labelAndValue.length == 0) return null;
 
                     return Stream.of(labelAndValue)
                             .filter(TextUtils::isNotNullOrBlank)
@@ -777,7 +789,7 @@ public class Drizzle implements Tool {
 
             StringBuilder sb = new StringBuilder(makeAutogenHeadingText())
                     .append(comment)
-                    .append(String.format("\n */\n\n"))
+                    .append("\n */\n\n")
                     .append(currentTab.getText());
 
             currentTab.setScrollPosition(0);

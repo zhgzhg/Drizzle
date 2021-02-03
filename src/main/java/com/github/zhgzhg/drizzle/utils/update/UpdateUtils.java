@@ -47,7 +47,7 @@ public class UpdateUtils {
             connection.setReadTimeout(5000);
             connection.connect();
 
-            StringBuffer content = new StringBuffer();
+            StringBuilder content = new StringBuilder();
 
             try (BufferedReader in = new BufferedReader(new InputStreamReader(connection.getInputStream()))) {
                 String inputLine;

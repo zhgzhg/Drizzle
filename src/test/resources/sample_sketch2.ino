@@ -11,6 +11,8 @@
  * @DependsOn Arduino_CRC32::1.0.0
  * @DependsOn Arduino Cloud Provider Examples::*
  * @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
+ *
+ * @ArduinoTool Drizzl3::(<=0.3)::file:///somewhere.zip
  */
 
 // Your sample code follows below just as usual

@@ -1,20 +1,15 @@
 package com.github.zhgzhg.drizzle;
 
-import com.github.zhgzhg.drizzle.utils.json.BoardSettingsSerializerCustomizer;
 import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
 import com.github.zhgzhg.drizzle.utils.update.UpdateUtils;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.List;
-import java.util.Map;
 
 public class DrizzleCLI {
 
@@ -51,9 +46,6 @@ public class DrizzleCLI {
     }
 
     private static void jsonToSketchMarkers(String jsonFile) {
-        Gson gson = new GsonBuilder()
-                .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
-                .create();
 
         try {
             String jsonData = new String(Files.readAllBytes(Paths.get(jsonFile)));

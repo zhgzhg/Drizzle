@@ -1,11 +1,13 @@
 package com.github.zhgzhg;
 
 import com.github.zhgzhg.drizzle.utils.json.BoardSettingsSerializerCustomizer;
+import com.github.zhgzhg.drizzle.utils.json.MapOfArduinoToolsSerializerCustomizer;
 import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.reflect.TypeToken;
 import org.junit.jupiter.api.Test;
 
 import java.io.BufferedReader;
@@ -13,6 +15,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -20,8 +24,8 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
-public class DrizzleParsingTest {
-    private LogProxy strictLogProxy = new LogProxy() {
+class DrizzleParsingTest {
+    private final LogProxy strictLogProxy = new LogProxy() {
         @Override
         public PrintStream stderr() {
             fail("CLI Error printed");
@@ -67,17 +71,26 @@ public class DrizzleParsingTest {
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
         Map<String, String> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
+        List<SourceExtractor.ArduinoTool> arduinoTools = sourceExtractor.arduinoToolsFromMainSketchSource(source);
+        Map<String, SourceExtractor.ArduinoTool> arduinoToolMap = null;
+        if (arduinoTools != null && !arduinoTools.isEmpty()) {
+            arduinoToolMap = new LinkedHashMap<>();
+            for (SourceExtractor.ArduinoTool at : arduinoTools) {
+                arduinoToolMap.put(at.name, at);
+            }
+        }
 
         ProjectSettings projectSettings = new ProjectSettings();
         projectSettings.setBoardManager(boardManager);
         projectSettings.setBoard(board);
         projectSettings.setBoardSettings(boardSettings);
         projectSettings.setLibraries(libraries);
+        projectSettings.setArduinoIdeTools(arduinoToolMap);
         return projectSettings;
     }
 
     @Test
-    public void sourceMarkerParserTest() throws IOException {
+    void sourceMarkerParserTest() throws IOException {
         String source = loadWholeTextResource("sample_sketch.ino");
         String source2 = loadWholeTextResource("sample_sketch2.ino");
         SourceExtractor sourceExtractor = new SourceExtractor(null, strictLogProxy);
@@ -85,8 +98,11 @@ public class DrizzleParsingTest {
         ProjectSettings projectSettings = createProjectSettings(sourceExtractor, source);
         ProjectSettings projectSettings2 = createProjectSettings(sourceExtractor, source2);
 
+        Type ardToolsContainerType = new TypeToken<Map<String, SourceExtractor.ArduinoTool>>() { }.getType();
+
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().serializeNulls()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
 
         assertEquals(loadWholeTextResource("sample_sketch_parsed.json"), gson.toJson(projectSettings));
@@ -94,9 +110,11 @@ public class DrizzleParsingTest {
     }
 
     @Test
-    public void jsonParserTest() throws IOException {
+    void jsonParserTest() throws IOException {
+        Type ardToolsContainerType = new TypeToken<Map<String, SourceExtractor.ArduinoTool>>() { }.getType();
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
 
         String json = loadWholeTextResource("sample_sketch_parsed.json");
@@ -108,6 +126,7 @@ public class DrizzleParsingTest {
         assertEquals(projSettingsTemplate.getBoard().toString(), projSettings.getBoard().toString());
         assertEquals(projSettingsTemplate.getBoardSettings().toString(), projSettings.getBoardSettings().toString());
         assertEquals(projSettingsTemplate.getLibraries().toString(), projSettings.getLibraries().toString());
+        assertEquals(projSettingsTemplate.getArduinoIdeTools().toString(), projSettings.getArduinoIdeTools().toString());
 
         json = loadWholeTextResource("sample_sketch_parsed2.json");
         projSettings = gson.fromJson(json, ProjectSettings.class);
@@ -118,5 +137,6 @@ public class DrizzleParsingTest {
         assertEquals(projSettingsTemplate.getBoard().toString(), projSettings.getBoard().toString());
         assertEquals(projSettingsTemplate.getBoardSettings().toString(), projSettings.getBoardSettings().toString());
         assertEquals(projSettingsTemplate.getLibraries().toString(), projSettings.getLibraries().toString());
+        assertEquals(projSettingsTemplate.getArduinoIdeTools().toString(), projSettings.getArduinoIdeTools().toString());
     }
 }

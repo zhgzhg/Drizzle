@@ -16,14 +16,11 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -35,6 +32,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SourceExtractor {
@@ -44,11 +42,13 @@ public class SourceExtractor {
     public static final String BOARDMANAGER_MARKER = "@BoardManager";
     public static final String BOARDNAME_MARKER = "@Board";
     public static final String BOARDSETTINGS_MARKER = "@BoardSettings";
+    public static final String ARDUINOTOOL_MARKER = "@ArduinoTool";
 
 
     public static final String PACKAGE_PROVIDER_GROUP = "package";
     public static final String PLATFORM_GROUP = "platform";
     public static final String LIB_GROUP = "lib";
+    public static final String TOOL_GROUP = "tool";
     public static final String VER_GROUP = "ver";
     public static final String URL_GROUP = "url";
     public static final String BOARD_GROUP = "board";
@@ -68,6 +68,9 @@ public class SourceExtractor {
 
     public static final Pattern DEPENDS_ON_LIB_VERSION =
             Pattern.compile("^[^@]*" + DEPENDSON_MARKER + "\\s+(?<" + LIB_GROUP + ">[^:]+)::(?<" + VER_GROUP + ">.+)$");
+
+    public static final Pattern ARDUINO_TOOL_VERSION = Pattern.compile("^[^@]*"
+            + ARDUINOTOOL_MARKER + "\\s+(?<" + TOOL_GROUP + ">[^:]+)::(?<"+ VER_GROUP + ">[^:]+)::(?<" + URL_GROUP + ">.+)$");
 
     private Editor editor;
     private File drizzleJsonFile;
@@ -126,7 +129,7 @@ public class SourceExtractor {
             boolean matching = (TextUtils.isNullOrBlank(board.platform) && TextUtils.isNullOrBlank(board.name));
 
             if (!matching) {
-                if (TextUtils.allNotNullOrBlank(board.platform, board.name)) {
+                if (TextUtils.allNotBlank(board.platform, board.name)) {
                     matching = board.platform.equals(platformName) && board.name.equals(boardName);
                 } else if (TextUtils.isNotNullOrBlank(board.platform)) {
                     matching = board.platform.equals(platformName);
@@ -142,6 +145,23 @@ public class SourceExtractor {
         public String toString() {
             return "BoardSettings{" + "board=" + board.toString().replaceFirst("providerPackage='[^']*', ", "")
                     + ", clickableOptions=" + clickableOptions + '}';
+        }
+    }
+
+    public static class ArduinoTool {
+        public final String name;
+        public final String version;
+        public final String url;
+
+        public ArduinoTool(final String name, final String version, final String url) {
+            this.name = name;
+            this.version = version;
+            this.url = url;
+        }
+
+        @Override
+        public String toString() {
+            return "ArduinoTool{" + "name='" + name + '\'' + ", version='" + version + '\'' + ", url='" + url + '\'' + '}';
         }
     }
 
@@ -210,7 +230,7 @@ public class SourceExtractor {
                 String boardName = boardCandidate.get(BOARD_GROUP);
 
 
-                if (result == null && TextUtils.allNotNullOrBlank(platformName, boardName)) {
+                if (result == null && TextUtils.allNotBlank(platformName, boardName)) {
                     result = new Board(providerPackage, platformName, boardName);
                 } else {
                     this.logProxy.cliError("Ignoring additional %s %s::%s::%s%n", BOARDNAME_MARKER, providerPackage,
@@ -294,11 +314,12 @@ public class SourceExtractor {
 
                     String url = result.getValue().get(URL_GROUP);
                     if (TextUtils.isNotNullOrBlank(url)) {
-                        try {
-                            new URL(url);
-                        } catch (MalformedURLException e) {
-                            this.logProxy.cliError("Invalid URL in comment %s %s::%s::%s - %s%n", BOARDMANAGER_MARKER,
-                                    result.getKey(), ver, url, e.getMessage());
+                        final Map.Entry<String, Map<String, String>> res = result;
+                        final String version = ver;
+                        if (TextUtils.toURL(url,
+                                ex -> logProxy.cliError("Invalid URL in comment %s %s::%s::%s - %s%n", BOARDMANAGER_MARKER,
+                                        res.getKey(), version, url, ex.getMessage())) == null) {
+
                             result = null;
                         }
                     }
@@ -335,9 +356,37 @@ public class SourceExtractor {
         return Collections.emptyMap();
     }
 
+    public List<ArduinoTool> arduinoToolsFromMainSketchSource(String source) {
+        ProjectSettings projectSettings = this.loadAllFromDrizzleJson();
+        if (projectSettings != null) {
+            return new ArrayList<>(projectSettings.getArduinoIdeTools().values());
+        }
+
+        try {
+            Map<String, Map<String, String>> toolVerUrl = extractMarkersKeyAndParams(extractAllCommentsFromSource(source),
+                    ARDUINO_TOOL_VERSION, ARDUINOTOOL_MARKER, TOOL_GROUP, Arrays.asList(VER_GROUP, URL_GROUP));
+
+            return toolVerUrl.entrySet().stream()
+                    .map(entry -> new ArduinoTool(entry.getKey(), entry.getValue().get(VER_GROUP),
+                            TextUtils.trim(entry.getValue().get(URL_GROUP), " "))
+                    )
+                    .filter(at -> null != at
+                            && TextUtils.isNotNullOrBlank(at.url)
+                            && null != TextUtils.toURL(at.url, ex -> logProxy.cliError("Invalid URL in comment %s %s::%s::%s - %s%n",
+                                ARDUINOTOOL_MARKER, at.name, at.version, at.url, ex.getMessage()))
+
+                    )
+                    .collect(Collectors.toList());
+        } catch (IOException e) {
+            e.printStackTrace(this.logProxy.stderr());
+        }
+
+        return Collections.emptyList();
+    }
+
     private Map<String, Map<String, String>> extractMarkersKeyAndParams(List<String> comments, Pattern marker, String markerName,
             String keyGroup, List<String> paramGroups) {
-        return this.extractMarkersKeyAndParams(comments, marker, markerName, keyGroup, paramGroups, (data) -> null);
+        return this.extractMarkersKeyAndParams(comments, marker, markerName, keyGroup, paramGroups, data -> null);
     }
 
     private Map<String, Map<String, String>> extractMarkersKeyAndParams(List<String> comments, Pattern marker, String markerName,

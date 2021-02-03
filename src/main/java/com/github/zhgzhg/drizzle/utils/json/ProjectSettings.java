@@ -6,7 +6,10 @@ import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.annotations.SerializedName;
+import com.google.gson.reflect.TypeToken;
 
+import java.lang.reflect.Type;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -18,6 +21,8 @@ public class ProjectSettings {
     @SerializedName("board_settings")
     private List<SourceExtractor.BoardSettings> boardSettings;
     private Map<String, String> libraries;
+    @SerializedName("arduino_ide_tools")
+    private Map<String, SourceExtractor.ArduinoTool> arduinoIdeTools;
 
     public SourceExtractor.BoardManager getBoardManager() {
         return boardManager;
@@ -51,8 +56,16 @@ public class ProjectSettings {
         this.libraries = libraries;
     }
 
+    public Map<String, SourceExtractor.ArduinoTool> getArduinoIdeTools() {
+        return arduinoIdeTools;
+    }
+
+    public void setArduinoIdeTools(final Map<String, SourceExtractor.ArduinoTool> arduinoIdeTools) {
+        this.arduinoIdeTools = arduinoIdeTools;
+    }
+
     public boolean containsData() {
-        return boardManager != null || board != null || boardSettings != null || libraries != null;
+        return boardManager != null || board != null || boardSettings != null || libraries != null || arduinoIdeTools != null;
     }
 
 
@@ -61,10 +74,10 @@ public class ProjectSettings {
         StringBuilder sb = new StringBuilder();
 
         if (this.getBoardManager() != null) {
-            String boardManager = String.format("%s %s::%s%s%n", SourceExtractor.BOARDMANAGER_MARKER, this.getBoardManager().platform,
+            String boardManagerStr = String.format("%s %s::%s%s%n", SourceExtractor.BOARDMANAGER_MARKER, this.getBoardManager().platform,
                     this.getBoardManager().version,
                     (TextUtils.isNotNullOrBlank(this.getBoardManager().url) ? "::" + this.getBoardManager().url : ""));
-            sb.append(boardManager);
+            sb.append(boardManagerStr);
         }
 
         if (this.getBoard() != null) {
@@ -90,8 +103,8 @@ public class ProjectSettings {
                 String name = bs.board.name;
                 if (name == null || name.isEmpty()) name = "*";
 
-                String boardSettings = String.format("%s %s::%s::%s%n", SourceExtractor.BOARDSETTINGS_MARKER, platform, name, opts);
-                sb.append(boardSettings);
+                String boardSettingsStr = String.format("%s %s::%s::%s%n", SourceExtractor.BOARDSETTINGS_MARKER, platform, name, opts);
+                sb.append(boardSettingsStr);
             });
         }
 
@@ -101,19 +114,31 @@ public class ProjectSettings {
             );
         }
 
+        if (this.getArduinoIdeTools() != null) {
+            this.getArduinoIdeTools().forEach((k, at) ->
+                    sb.append(String.format("%s %s::%s::%s%n", SourceExtractor.ARDUINOTOOL_MARKER, at.name, at.version, at.url))
+            );
+        }
+
         return sb.toString();
     }
 
     public static String toJSON(ProjectSettings projectSettings) {
+        Type ardToolsContainerType = new TypeToken<Map<String, SourceExtractor.ArduinoTool>>() { }.getType();
+
         Gson gson = new GsonBuilder().disableHtmlEscaping().serializeNulls().setPrettyPrinting()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
         return gson.toJson(projectSettings);
     }
 
     public static ProjectSettings fromJSON(String json, LogProxy logger) {
+        Type ardToolsContainerType = new TypeToken<Map<String, SourceExtractor.ArduinoTool>>() { }.getType();
+
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
         try {
             return gson.fromJson(json, ProjectSettings.class);
@@ -129,12 +154,22 @@ public class ProjectSettings {
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
         Map<String, String> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
+        List<SourceExtractor.ArduinoTool> arduinoTools = sourceExtractor.arduinoToolsFromMainSketchSource(source);
+
+        Map<String, SourceExtractor.ArduinoTool> arduinoToolsMap = null;
+        if (arduinoTools != null && !arduinoTools.isEmpty()) {
+            arduinoToolsMap = new LinkedHashMap<>();
+            for (SourceExtractor.ArduinoTool at : arduinoTools) {
+                arduinoToolsMap.put(at.name, at);
+            }
+        }
 
         ProjectSettings projectSettings = new ProjectSettings();
         projectSettings.setBoardManager(boardManager);
         projectSettings.setBoard(board);
         projectSettings.setBoardSettings(boardSettings);
         projectSettings.setLibraries(libraries);
+        projectSettings.setArduinoIdeTools(arduinoToolsMap);
 
         return projectSettings;
     }
