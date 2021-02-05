@@ -711,7 +711,7 @@ public class Drizzle implements Tool {
         } catch (RunnerException runnerException) {
             logProxy.cliError(runnerException.getMessage());
         } finally {
-            editorStatus.ifPresent(es -> es.unprogress());
+            editorStatus.ifPresent(EditorStatus::unprogress);
         }
 
         return libs.entrySet()
