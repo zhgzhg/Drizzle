@@ -23,6 +23,7 @@ import com.github.zhgzhg.drizzle.utils.update.UpdateUtils;
 import processing.app.Base;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
+import processing.app.EditorStatus;
 import processing.app.EditorTab;
 import processing.app.PreferencesData;
 import processing.app.SketchFile;
@@ -49,6 +50,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -166,6 +168,7 @@ public class Drizzle implements Tool {
                     }
 
                     if (installedToolsCount > 0) {
+                        logProxy.uiInfo("You'll have to restart Arduino IDE in for the new tools to get loaded.");
                         logProxy.cliInfoln("Please restart the IDE in order to load the newly installed tools.");
                     }
 
@@ -671,6 +674,16 @@ public class Drizzle implements Tool {
         final Map<String, String> libs = new HashMap<>();
         Pattern libsPattern = Pattern.compile(".*-> candidates: \\[([^\\]]+)\\].*");
 
+        Optional<EditorStatus> editorStatus = uiLocator.editorStatus();
+        editorStatus.ifPresent(es -> es.progress("Gathering dependency information..."));
+
+        Consumer<Integer> progressVisualizer = editorStatus.map(es -> new Consumer<Integer>() {
+            @Override
+            public void accept(final Integer integer) {
+                es.progressUpdate(integer);
+            }
+        }).orElse(null);
+
         try {
             new CompilationInvoker(editor, logProxy, msg -> {
                 Matcher matcher = libsPattern.matcher(msg);
@@ -694,9 +707,11 @@ public class Drizzle implements Tool {
                                 libs.put(TextUtils.trim(nameAndVersion[0], " "), ver);
                             });
                 }
-            }).compile();
+            }, progressVisualizer).compile();
         } catch (RunnerException runnerException) {
             logProxy.cliError(runnerException.getMessage());
+        } finally {
+            editorStatus.ifPresent(es -> es.unprogress());
         }
 
         return libs.entrySet()
