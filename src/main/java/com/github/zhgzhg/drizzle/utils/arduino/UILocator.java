@@ -4,6 +4,7 @@ import com.github.zhgzhg.drizzle.Drizzle;
 import processing.app.Base;
 import processing.app.Editor;
 import processing.app.EditorConsole;
+import processing.app.EditorStatus;
 import processing.app.I18n;
 
 import javax.swing.*;
@@ -36,6 +37,21 @@ public class UILocator {
                 .flatMap(c -> Stream.of(((JPanel) c).getComponents()))
                 .filter(c -> c instanceof EditorConsole)
                 .map(c -> (EditorConsole) c)
+                .findFirst();
+    }
+
+    public Optional<EditorStatus> editorStatus() {
+        return Stream.of(editor.getContentPane().getComponents())
+                .filter(c -> c instanceof JPanel)
+                .flatMap(c -> Stream.of(((JPanel) c).getComponents()))
+                .filter(c -> c instanceof Box)
+                .flatMap(c -> Stream.of(((Box) c).getComponents()))
+                .filter(c -> c instanceof JSplitPane)
+                .flatMap(c -> Stream.of(((JSplitPane) c).getComponents()))
+                .filter(c -> c instanceof JPanel)
+                .flatMap(c -> Stream.of(((JPanel) c).getComponents()))
+                .filter(c -> c instanceof EditorStatus)
+                .map(c -> (EditorStatus) c)
                 .findFirst();
     }
 
