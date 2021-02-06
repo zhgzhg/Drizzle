@@ -8,7 +8,7 @@ Drizzle installs libraries, platforms, boards, picks board-specific settings, an
 __The preferences are described into the sketch's comments or in a separate JSON file__. Switching between Arduino projects with different
 settings or compiling them on different environments has never been easier! 
 
-![Build Distribution Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Fat%20Jar/badge.svg)
+![Build Distribution Jar](https://github.com/zhgzhg/Drizzle/workflows/Build%20Distribution%20Jar/badge.svg)
 
 Drizzle operates on top of Arduino IDE's library and board manager. It enables them to provide components, which now can be described in
 text form. Because the only change in the sketch is the addition of a few _comments_ or editing _a separate JSON file_, the sketch will
