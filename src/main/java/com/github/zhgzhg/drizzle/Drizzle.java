@@ -13,8 +13,8 @@ import com.github.gundy.semver4j.model.Version;
 import com.github.zhgzhg.drizzle.utils.arduino.ArduinoIDEToolsInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
-import com.github.zhgzhg.drizzle.utils.file.FileUtils;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
+import com.github.zhgzhg.drizzle.utils.file.FileUtils;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.log.ProgressPrinter;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
@@ -64,6 +64,7 @@ public class Drizzle implements Tool {
     public static final String METU_AUTOGEN_ALL_MARKERS_TITLE = "Auto-generate @Board* and @Dependency Markers (via compilation)";
     public static final String MENU_AUTOGEN_BOARD_MARKERS_TITLE = "Auto-generate @Board* Markers";
     public static final String MENU_ARDUINO_TOOL_INSTALL_TITLE = "Install tools marked with @ArduinoTool";
+    public static final String MENU_ABOUT_DRIZZLE = "About Drizzle";
 
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
@@ -79,6 +80,7 @@ public class Drizzle implements Tool {
     private JMenuItem boardSettingsAndDependenciesGeneratorMenu = new JMenuItem(METU_AUTOGEN_ALL_MARKERS_TITLE);
     private JMenuItem boardAndSettingsGeneratorMenu = new JMenuItem(MENU_AUTOGEN_BOARD_MARKERS_TITLE);
     private JMenuItem arduinoToolInstallMenu = new JMenuItem(MENU_ARDUINO_TOOL_INSTALL_TITLE);
+    private JMenuItem aboutDrizzleMenu = new JMenuItem(MENU_ABOUT_DRIZZLE);
 
     @Override
     public void init(final Editor editor) {
@@ -177,6 +179,11 @@ public class Drizzle implements Tool {
             }
         });
 
+        this.aboutDrizzleMenu.addActionListener(e -> {
+            JOptionPane.showMessageDialog(null, String.format("Drizzle %s - a dependency helper tool for Arduino IDE%n%n%s%n",
+                    UpdateUtils.version(), UpdateUtils.webUrl()), MENU_ABOUT_DRIZZLE, JOptionPane.PLAIN_MESSAGE, null);
+        });
+
         this.editor.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentShown(final ComponentEvent e) {
@@ -197,6 +204,7 @@ public class Drizzle implements Tool {
                             drizzleMenus.add(boardAndSettingsGeneratorMenu);
                             drizzleMenus.add(boardSettingsAndDependenciesGeneratorMenu);
                             drizzleMenus.add(arduinoToolInstallMenu);
+                            drizzleMenus.add(aboutDrizzleMenu);
 
                             m.remove(index);
                             m.add(drizzleMenus, index);
@@ -206,7 +214,22 @@ public class Drizzle implements Tool {
 
                 SwingUtilities.invokeLater(() -> {
                     if (!UpdateUtils.isTheLatestVersion(logProxy)) {
-                        NotificationPopup notification = UpdateUtils.createNewVersionPopupNotification(editor, logProxy);
+                        NotificationPopup notification = UpdateUtils.createNewVersionPopupNotification(editor, logProxy,
+                                "Install the update & close the IDE", () ->
+                            new Thread(() -> {
+                                ArduinoIDEToolsInstaller drizzleInstaller = new ArduinoIDEToolsInstaller(logProxy);
+                                logProxy.cliInfo("Downloading & installing the latest version of Drizzle (please wait)... ");
+
+                                boolean isSuccess = drizzleInstaller.installTool(MENUS_HOLDER, UpdateUtils.latestVersionOfDistZIP());
+                                if (isSuccess) {
+                                    drizzleInstaller.selfDestroyJarOnExit();
+                                    logProxy.cliWarn("succeeded!%nThe Arduino IDE will be closed in 10 seconds...%n");
+                                    drizzleInstaller.killJVM(10);
+                                } else {
+                                    logProxy.cliError("failed! Please try again later.%n");
+                                }
+                            }).start()
+                        );
                         notification.begin();
                     }
                 });
