@@ -214,9 +214,11 @@ public class Drizzle implements Tool {
 
                 SwingUtilities.invokeLater(() -> {
                     if (!UpdateUtils.isTheLatestVersion(logProxy)) {
-                        NotificationPopup notification = UpdateUtils.createNewVersionPopupNotification(editor, logProxy,
-                                "Install the update & close the IDE", () ->
-                            new Thread(() -> {
+                        final NotificationPopup[] notificationHolder = new NotificationPopup[1];
+                        notificationHolder[0] = UpdateUtils.createNewVersionPopupNotification(editor, logProxy,
+                                "Install the update & close the IDE", () -> {
+
+                                notificationHolder[0].close();
                                 ArduinoIDEToolsInstaller drizzleInstaller = new ArduinoIDEToolsInstaller(logProxy);
                                 logProxy.cliInfo("Downloading & installing the latest version of Drizzle (please wait)... ");
 
@@ -228,9 +230,9 @@ public class Drizzle implements Tool {
                                 } else {
                                     logProxy.cliError("failed! Please try again later.%n");
                                 }
-                            }).start()
+                            }
                         );
-                        notification.begin();
+                        notificationHolder[0].begin();
                     }
                 });
             }
