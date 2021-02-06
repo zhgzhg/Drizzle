@@ -10,22 +10,38 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.jar.JarFile;
 
 public class ArduinoIDEToolsInstaller {
+    private final Path drizzleJarLocation;
     private final Path ideToolsDir;
     private final LogProxy logProxy;
 
     public ArduinoIDEToolsInstaller(LogProxy logProxy) {
         this.logProxy = logProxy;
-        this.ideToolsDir = Paths.get(URI.create("file://" + this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()))
-                .getParent()
-                .getParent()
-                .getParent()
-                .toAbsolutePath();
+        this.drizzleJarLocation = Paths.get(URI.create("file://" + this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()));
+        this.ideToolsDir = this.drizzleJarLocation.getParent().getParent().getParent().toAbsolutePath();
+    }
+
+    public void selfDestroyJarOnExit() {
+        File drizzleJar = drizzleJarLocation.toFile();
+        if (!drizzleJar.delete()) {
+            drizzleJar.deleteOnExit();
+
+            try {
+                URLClassLoader loader = (URLClassLoader) this.getClass().getClassLoader();
+                loader.close();
+                if (!drizzleJar.delete()) {
+                    drizzleJar.deleteOnExit();
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace(System.err);
+            }
+        }
     }
 
     public String extractInstalledToolVersion(String toolName) {
@@ -113,5 +129,19 @@ public class ArduinoIDEToolsInstaller {
         fileUtils.delayedFileRemoval(1000, tempFile);
 
         return isSuccess;
+    }
+
+    public void killJVM(long afterSeconds) {
+        new Thread(() -> {
+            try {
+                for (long j = 0; j < afterSeconds; ++j) {
+                    Thread.sleep( 1000);
+                    System.err.println('.');
+                }
+            } catch (InterruptedException ex) {
+                // don't care
+            }
+            System.exit(1);
+        }).start();
     }
 }
