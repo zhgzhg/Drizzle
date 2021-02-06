@@ -134,10 +134,11 @@ public class ArduinoIDEToolsInstaller {
     public void killJVM(long afterSeconds) {
         new Thread(() -> {
             try {
-                for (long j = 0; j < afterSeconds; ++j) {
+                for (long j = afterSeconds; j > 0; --j) {
+                    System.err.printf(".............%d.............%n", j);
                     Thread.sleep( 1000);
-                    System.err.println('.');
                 }
+                System.err.println("..........JVM STOP...........%n");
             } catch (InterruptedException ex) {
                 // don't care
             }
