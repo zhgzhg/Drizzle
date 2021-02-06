@@ -118,7 +118,7 @@ public class UpdateUtils {
             NotificationPopup.OptionalButtonCallbacks callbacks, String button1Title, String button2Title) {
 
         boolean isAccessible = PreferencesData.getBoolean("ide.accessible");
-        String newVersionOfDrizzle = "A newer version of <a href=\"" + webLatestReleaseUrl() + "\"> the Drizzle Tool is available</a>";
+        String newVersionOfDrizzle = "A newer version of <a href=\"" + webLatestReleaseUrl() + "\"> the Drizzle tool is available</a>";
 
         HyperlinkListener hyperlinkListener = hyperlinkEvent -> {
             if (hyperlinkEvent.getEventType() != HyperlinkEvent.EventType.ACTIVATED) return;
