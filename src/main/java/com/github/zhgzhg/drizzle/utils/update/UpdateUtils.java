@@ -17,6 +17,8 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 public class UpdateUtils {
@@ -36,7 +38,7 @@ public class UpdateUtils {
         return "https://github.com/zhgzhg/Drizzle/releases/latest";
     }
 
-    public static String latestVersion() {
+    public static Map<String, Object> webLatestStats() {
         try {
             URL url = new URL("https://api.github.com/repos/zhgzhg/Drizzle/releases/latest");
 
@@ -58,12 +60,34 @@ public class UpdateUtils {
 
             connection.disconnect();
 
-            Map<String, Object> results = new GsonBuilder().create().fromJson(content.toString(), Map.class);
-
-            return results.getOrDefault("tag_name", version()).toString();
+            return new GsonBuilder().create().fromJson(content.toString(), Map.class);
         } catch (Exception e) {
-            return version();
+            e.printStackTrace(System.err);
         }
+
+        return Collections.emptyMap();
+    }
+
+    public static String latestVersion() {
+        Map<String, Object> projectStats = webLatestStats();
+        return projectStats.getOrDefault("tag_name", version()).toString();
+    }
+
+    public static String latestVersionOfDistZIP() {
+        Map<String, Object> projectStats = webLatestStats();
+        List<Map<String, Object>> assets = (List<Map<String, Object>> ) projectStats.getOrDefault("assets", Collections.emptyList());
+
+        for (Map<String, Object> asset : assets) {
+            if ("application/zip".equalsIgnoreCase((String) asset.get("content_type"))) {
+                String filename = asset.getOrDefault("name", "").toString();
+
+                if (filename.endsWith("-dist.zip")) {
+                    return (String) asset.get("browser_download_url");
+                }
+            }
+        }
+
+        return null;
     }
 
     public static boolean isTheLatestVersion(LogProxy logProxy) {
@@ -78,7 +102,21 @@ public class UpdateUtils {
         }
     }
 
-    public static NotificationPopup createNewVersionPopupNotification(Editor ed, LogProxy logProxy) {
+    public static NotificationPopup createNewVersionPopupNotification(
+            Editor ed, LogProxy logProxy, String button1Title, Runnable button1Callback) {
+
+        return createNewVersionPopupNotification(ed, logProxy, new NotificationPopup.OptionalButtonCallbacks() {
+            @Override
+            public void onOptionalButton1Callback() { button1Callback.run(); }
+
+            @Override
+            public void onOptionalButton2Callback() { }
+        }, button1Title, null);
+    }
+
+    public static NotificationPopup createNewVersionPopupNotification(Editor ed, LogProxy logProxy,
+            NotificationPopup.OptionalButtonCallbacks callbacks, String button1Title, String button2Title) {
+
         boolean isAccessible = PreferencesData.getBoolean("ide.accessible");
         String newVersionOfDrizzle = "A newer version of <a href=\"" + webLatestReleaseUrl() + "\"> the Drizzle Tool is available</a>";
 
@@ -107,9 +145,9 @@ public class UpdateUtils {
         };
 
         if (isAccessible) {
-            return new NotificationPopup(ed, hyperlinkListener, newVersionOfDrizzle, false);
+            return new NotificationPopup(ed, hyperlinkListener, newVersionOfDrizzle, false, callbacks, button1Title, button2Title);
         }
 
-        return new NotificationPopup(ed, hyperlinkListener, newVersionOfDrizzle);
+        return new NotificationPopup(ed, hyperlinkListener, newVersionOfDrizzle, true, callbacks, button1Title, button2Title);
     }
 }
