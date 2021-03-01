@@ -1,6 +1,6 @@
 Drizzle
 =======
-A lightweight dependency manager helper tool for Arduino IDE.
+Dependency manager tool for Arduino IDE v1.8.x.
 
 <img alt="Drizzle" src="https://raw.githubusercontent.com/zhgzhg/Drizzle/master/drizzle-logo.svg?sanitize=true" />
 
