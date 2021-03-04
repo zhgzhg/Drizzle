@@ -206,7 +206,6 @@ public class Drizzle implements Tool {
                             drizzleMenus.add(arduinoToolInstallMenu);
                             drizzleMenus.add(aboutDrizzleMenu);
 
-                            m.remove(index);
                             m.add(drizzleMenus, index);
                             m.revalidate();
                             editor.removeComponentListener(this);
