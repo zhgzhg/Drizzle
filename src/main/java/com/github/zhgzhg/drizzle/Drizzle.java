@@ -401,6 +401,14 @@ public class Drizzle implements Tool {
             e.printStackTrace(this.logProxy.stderr());
             return 0;
         }
+
+        try {
+            BaseNoGui.indexer.parseIndex();
+        } catch (Exception e) {
+            e.printStackTrace(this.logProxy.stderr());
+            return 0;
+        }
+
         this.logProxy.cliInfoln(" done!\n");
 
         this.logProxy.cliInfoln("Preparing platform installation...");
