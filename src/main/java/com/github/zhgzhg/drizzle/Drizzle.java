@@ -60,8 +60,8 @@ import java.util.stream.Stream;
 public class Drizzle implements Tool {
 
     public static final String MENUS_HOLDER = "Drizzle";
-    public static final String MENU_TITLE = "Apply Markers";
-    public static final String METU_AUTOGEN_ALL_MARKERS_TITLE = "Auto-generate @Board* and @Dependency Markers (via compilation)";
+    public static final String MENU_APPLY_MARKERS = "Apply Markers";
+    public static final String MENU_AUTOGEN_ALL_MARKERS_TITLE = "Auto-generate @Board* and @Dependency Markers (via compilation)";
     public static final String MENU_AUTOGEN_BOARD_MARKERS_TITLE = "Auto-generate @Board* Markers";
     public static final String MENU_ARDUINO_TOOL_INSTALL_TITLE = "Install tools marked with @ArduinoTool";
     public static final String MENU_ABOUT_DRIZZLE = "About Drizzle";
@@ -77,7 +77,8 @@ public class Drizzle implements Tool {
     private LogProxy logProxy;
     private UILocator uiLocator;
 
-    private JMenuItem boardSettingsAndDependenciesGeneratorMenu = new JMenuItem(METU_AUTOGEN_ALL_MARKERS_TITLE);
+    private JMenuItem applyDrizzleMarkersMenu = new JMenuItem(MENU_APPLY_MARKERS);
+    private JMenuItem boardSettingsAndDependenciesGeneratorMenu = new JMenuItem(MENU_AUTOGEN_ALL_MARKERS_TITLE);
     private JMenuItem boardAndSettingsGeneratorMenu = new JMenuItem(MENU_AUTOGEN_BOARD_MARKERS_TITLE);
     private JMenuItem arduinoToolInstallMenu = new JMenuItem(MENU_ARDUINO_TOOL_INSTALL_TITLE);
     private JMenuItem aboutDrizzleMenu = new JMenuItem(MENU_ABOUT_DRIZZLE);
@@ -106,6 +107,13 @@ public class Drizzle implements Tool {
 
         this.contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
         this.libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
+
+        this.applyDrizzleMarkersMenu.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                Drizzle.this.run();
+            }
+        });
 
         this.boardSettingsAndDependenciesGeneratorMenu.addActionListener(new AbstractAction() {
             @Override
@@ -200,13 +208,14 @@ public class Drizzle implements Tool {
                             int index = m.getComponentIndex(drizzleMenu.get());
 
                             JMenu drizzleMenus = new JMenu(MENUS_HOLDER);
-                            drizzleMenus.add(drizzleMenu.get());
+                            drizzleMenus.add(applyDrizzleMarkersMenu);
                             drizzleMenus.add(boardAndSettingsGeneratorMenu);
                             drizzleMenus.add(boardSettingsAndDependenciesGeneratorMenu);
                             drizzleMenus.add(arduinoToolInstallMenu);
                             drizzleMenus.add(aboutDrizzleMenu);
 
                             m.add(drizzleMenus, index);
+                            m.remove(index + 1);
                             m.revalidate();
                             editor.removeComponentListener(this);
                         });
@@ -240,7 +249,7 @@ public class Drizzle implements Tool {
 
     @Override
     public String getMenuTitle() {
-        return MENU_TITLE;
+        return MENUS_HOLDER;
     }
 
     @Override
@@ -691,7 +700,7 @@ public class Drizzle implements Tool {
         return String.format("/**\n * Automatically generated markers by Drizzle %s dependency helper tool, based on the selected"
                 + "\n * at that moment board options in Arduino IDE's UI. To apply them make sure this file is saved, then click on"
                 + "\n * Tools -> %s -> %s. To obtain Drizzle visit: %s"
-                + "\n *", UpdateUtils.version(), MENUS_HOLDER, MENU_TITLE, UpdateUtils.webUrl());
+                + "\n *", UpdateUtils.version(), MENUS_HOLDER, MENU_APPLY_MARKERS, UpdateUtils.webUrl());
     }
 
     private List<String> autogenDependencyMarkers(final ActionEvent e) {
