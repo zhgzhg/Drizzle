@@ -1,6 +1,6 @@
 /**
  * Slightly modified, the original is obtained from:
- * https://raw.githubusercontent.com/antlr/grammars-v4/f20066f6b2d55d14d4dc22cac61e555a2563e8d3/cpp/CPP14Lexer.g4
+ * https://raw.githubusercontent.com/antlr/grammars-v4/c2fbe7117988aff912b42fe86ff63504e8572e66/cpp/CPP14Lexer.g4
  */
 
 lexer grammar CPP14Lexer;
@@ -24,8 +24,9 @@ FloatingLiteral:
 	| Digitsequence Exponentpart Floatingsuffix?;
 
 StringLiteral:
-	Encodingprefix? '"' Schar* '"'
-	| Encodingprefix? 'R' Rawstring;
+	Encodingprefix?
+    (Rawstring
+	|'"' Schar* '"');
 
 BooleanLiteral: False_ | True_;
 
@@ -391,7 +392,7 @@ fragment Schar:
 	| Escapesequence
 	| Universalcharactername;
 
-fragment Rawstring: '"' ~[\r\n(]* '(' ~[\r\n)]* ')' ~[\r\n"]* '"';
+fragment Rawstring: 'R"' (( '\\' ["()] )|~[\r\n (])*? '(' ~[)]*? ')'  (( '\\' ["()]) | ~[\r\n "])*? '"';
 
 UserDefinedIntegerLiteral:
 	DecimalLiteral Udsuffix
