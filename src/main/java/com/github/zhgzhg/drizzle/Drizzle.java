@@ -466,9 +466,14 @@ public class Drizzle implements Tool {
                 refreshUI = true;
                 this.logProxy.cliInfoln(" done!");
             } catch (Exception e) {
-                this.logProxy.cliErrorln();
-                this.logProxy.cliErrorln(e);
-                this.logProxy.uiError(e.getMessage());
+                if (e.getMessage() != null && e.getMessage().contains("Can't extract file")
+                        && e.getMessage().contains(", file already exists!")) {
+                    this.logProxy.cliInfoln(" done!");
+                } else {
+                    this.logProxy.cliErrorln();
+                    this.logProxy.cliErrorln(e);
+                    this.logProxy.uiError(e.getMessage());
+                }
             }
         }
         return refreshUI;
