@@ -394,13 +394,7 @@ public class Drizzle implements Tool {
 
         this.logProxy.cliInfo("Updating platform definitions list...");
         this.progressPrinter.begin(1, -1, 100, "...");
-        List<String> downloadedPackageIndexFiles = this.contributionInstaller.updateIndex(this.progressListener);
-        try {
-            this.contributionInstaller.deleteUnknownFiles(downloadedPackageIndexFiles);
-        } catch (IOException e) {
-            e.printStackTrace(this.logProxy.stderr());
-            return 0;
-        }
+        this.contributionInstaller.updateIndex(this.progressListener);
 
         try {
             BaseNoGui.indexer.parseIndex();
