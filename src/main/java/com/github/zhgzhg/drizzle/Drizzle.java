@@ -223,16 +223,12 @@ public class Drizzle implements Tool {
                         });
 
                 SwingUtilities.invokeLater(() -> {
-                    try {
-                        if (UpdateUtils.arduinoRevision() < 10814) {
-                            JOptionPane.showMessageDialog(editor, String.format(
-                                    "Drizzle %s is not compatible with Arduino IDE %s!!!%nPlease downgrade the plugin or update your IDE.%n",
-                                    UpdateUtils.version(), UpdateUtils.arduinoVersion()), "Incompatible version of Drizzle and Arduino IDE",
-                                    JOptionPane.WARNING_MESSAGE, null);
-                            return;
-                        }
-                    } catch (Exception excp) {
-                        logProxy.cliErrorln(excp);
+                    if (UpdateUtils.arduinoRevision() < 10814) {
+                        JOptionPane.showMessageDialog(editor, String.format(
+                                "Drizzle %s is not compatible with Arduino IDE %s!!!%nPlease downgrade the plugin or update your IDE.%n",
+                                UpdateUtils.version(), UpdateUtils.arduinoVersion()), "Incompatible version of Drizzle and Arduino IDE",
+                                JOptionPane.WARNING_MESSAGE, null);
+                        return;
                     }
 
                     if (!UpdateUtils.isTheLatestVersion(logProxy)) {
