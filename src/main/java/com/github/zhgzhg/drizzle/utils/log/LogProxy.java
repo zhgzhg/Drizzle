@@ -1,28 +1,32 @@
 package com.github.zhgzhg.drizzle.utils.log;
 
-import processing.app.EditorConsole;
-
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.util.function.Supplier;
 
-public class LogProxy {
+public class LogProxy<T> {
+
     private static final PrintStream dummyPrintStream = new PrintStream(
             new OutputStream() { @Override public void write(final int b) throws IOException { }}) { };
 
-    private EditorConsole editorConsole;
+    public interface EditorConsoleSupplierAndSetter<T> extends Supplier<T>, Runnable {
 
-    public void setEditorConsole(final EditorConsole editorConsole) {
-        this.editorConsole = editorConsole;
     }
 
-    public EditorConsole getEditorConsole() {
-        return editorConsole;
+    private EditorConsoleSupplierAndSetter<T> editorConsoleSupplierAndSetter;
+
+    public void setEditorConsole(final EditorConsoleSupplierAndSetter<T> editorConsoleSupplierAndSetter) {
+        this.editorConsoleSupplierAndSetter = editorConsoleSupplierAndSetter;
+    }
+
+    public T getEditorConsole() {
+        return editorConsoleSupplierAndSetter.get();
     }
 
     protected void beforeStdReturn() {
-        if (this.editorConsole != null) {
-            EditorConsole.setCurrentEditorConsole(this.editorConsole);
+        if (this.editorConsoleSupplierAndSetter != null) {
+            editorConsoleSupplierAndSetter.run();
         }
     }
 

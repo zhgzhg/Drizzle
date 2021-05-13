@@ -1,10 +1,9 @@
-package com.github.zhgzhg.drizzle.utils.update;
+package com.github.zhgzhg.drizzle.utils.arduino;
 
 import cc.arduino.view.NotificationPopup;
 import com.github.gundy.semver4j.model.Version;
 import com.github.zhgzhg.drizzle.DrizzleCLI;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
-import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import com.google.gson.GsonBuilder;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
@@ -52,12 +51,6 @@ public class UpdateUtils {
         return revision;
     }
 
-    public static String version() {
-        String implementationVersion = DrizzleCLI.class.getPackage().getImplementationVersion();
-        if (TextUtils.isNullOrBlank(implementationVersion)) implementationVersion = "SNAPSHOT";
-        return implementationVersion;
-    }
-
     public static String webUrl() {
         return "https://github.com/zhgzhg/Drizzle";
     }
@@ -100,7 +93,7 @@ public class UpdateUtils {
 
     public static String latestVersion() {
         Map<String, Object> projectStats = webLatestStats();
-        return projectStats.getOrDefault("tag_name", version()).toString();
+        return projectStats.getOrDefault("tag_name", DrizzleCLI.version()).toString();
     }
 
     public static String latestVersionOfDistZIP() {
@@ -123,7 +116,7 @@ public class UpdateUtils {
     public static boolean isTheLatestVersion(LogProxy logProxy) {
         try {
             Version latest = Version.fromString(latestVersion());
-            Version current = Version.fromString(version());
+            Version current = Version.fromString(DrizzleCLI.version());
 
             return current.compareTo(latest) >= 0;
         } catch (Exception e) {

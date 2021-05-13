@@ -3,7 +3,7 @@ package com.github.zhgzhg.drizzle;
 import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
-import com.github.zhgzhg.drizzle.utils.update.UpdateUtils;
+import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 
 import java.io.File;
 import java.io.IOException;
@@ -15,7 +15,7 @@ public class DrizzleCLI {
 
     public static void main(String[] args) {
         if (args.length > 0 && (args[0].equals("-h") || args[0].equals("--help"))) {
-            String implementationVersion = UpdateUtils.version();
+            String implementationVersion = version();
 
             System.out.printf("Drizzle %s CLI Helper%n", implementationVersion);
 
@@ -98,5 +98,11 @@ public class DrizzleCLI {
 
         ProjectSettings projectSettings = ProjectSettings.fromSource(sourceExtractor, source);
         System.out.println(ProjectSettings.toJSON(projectSettings));
+    }
+
+    public static String version() {
+        String implementationVersion = DrizzleCLI.class.getPackage().getImplementationVersion();
+        if (TextUtils.isNullOrBlank(implementationVersion)) implementationVersion = "SNAPSHOT";
+        return implementationVersion;
     }
 }
