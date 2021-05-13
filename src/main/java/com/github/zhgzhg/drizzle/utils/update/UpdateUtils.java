@@ -15,6 +15,7 @@ import java.awt.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URL;
 import java.util.Collections;
@@ -61,6 +62,8 @@ public class UpdateUtils {
             connection.disconnect();
 
             return new GsonBuilder().create().fromJson(content.toString(), Map.class);
+        } catch (SocketTimeoutException e) {
+            // don't pollute with unnecessary errors
         } catch (Exception e) {
             e.printStackTrace(System.err);
         }
@@ -121,7 +124,8 @@ public class UpdateUtils {
         String newVersionOfDrizzle = "A newer version of <a href=\"" + webLatestReleaseUrl() + "\"> the Drizzle tool is available</a>";
 
         HyperlinkListener hyperlinkListener = hyperlinkEvent -> {
-            if (hyperlinkEvent.getEventType() != HyperlinkEvent.EventType.ACTIVATED) return;
+            if (hyperlinkEvent.getEventType() != HyperlinkEvent.EventType.ACTIVATED)
+                return;
 
             try {
                 if (Desktop.isDesktopSupported()) {
@@ -135,7 +139,7 @@ public class UpdateUtils {
                     Runtime runtime = Runtime.getRuntime();
                     if (currOS.contains("mac")) {
                         runtime.exec("open " + webLatestReleaseUrl());
-                    } else if(currOS.contains("nix") || currOS.contains("nux")) {
+                    } else if (currOS.contains("nix") || currOS.contains("nux")) {
                         runtime.exec("xdg-open " + webLatestReleaseUrl());
                     }
                 }
