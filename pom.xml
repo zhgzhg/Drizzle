@@ -154,7 +154,7 @@
                             <goal>wget</goal>
                         </goals>
                         <configuration>
-                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/c2fbe7117988aff912b42fe86ff63504e8572e66/cpp/CPP14Lexer.g4</url>
+                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/6e10f7e59d7e556efc47fa0909b814cb4f596f3a/cpp/CPP14Lexer.g4</url>
                             <outputFileName>CPP14Lexer.g4</outputFileName>
                             <outputDirectory>${project.build.sourceDirectory}/../antlr4/com/github/zhgzhg/drizzle/parser</outputDirectory>
                         </configuration>
@@ -165,7 +165,7 @@
                             <goal>wget</goal>
                         </goals>
                         <configuration>
-                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/c2fbe7117988aff912b42fe86ff63504e8572e66/cpp/CPP14Parser.g4</url>
+                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/6e10f7e59d7e556efc47fa0909b814cb4f596f3a/cpp/CPP14Parser.g4</url>
                             <outputFileName>CPP14Parser.g4</outputFileName>
                             <outputDirectory>${project.build.sourceDirectory}/../antlr4/com/github/zhgzhg/drizzle/parser</outputDirectory>
                         </configuration>
