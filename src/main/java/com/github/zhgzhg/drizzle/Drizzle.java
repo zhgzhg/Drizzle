@@ -196,6 +196,16 @@ public class Drizzle implements Tool {
         this.editor.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentShown(final ComponentEvent e) {
+                if (BaseNoGui.REVISION < 10814) {
+                    SwingUtilities.invokeLater(() -> {
+                        JOptionPane.showMessageDialog(null, String.format(
+                                "Drizzle %s is not compatible with Arduino IDE %s!!!%nPlease downgrade the plugin or update your IDE.%n",
+                                UpdateUtils.version(), BaseNoGui.VERSION_NAME), "Incompatible version of Drizzle and Arduino IDE",
+                                JOptionPane.WARNING_MESSAGE, null);
+                    });
+                    return;
+                }
+
                 Optional<JMenuItem> drizzleMenu = uiLocator.drizzleMenu();
                 drizzleMenu
                         .<JPopupMenu>map(dm -> {
