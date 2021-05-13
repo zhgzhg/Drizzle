@@ -46,7 +46,7 @@ jobs:
           echo '"}' >>package.json
 
       - name: Generate Changelog
-        uses: scottbrenner/generate-changelog-action@1.0.3
+        uses: scottbrenner/generate-changelog-action@v1.3.0
         id: Changelog
         env:
           REPO: ${{ github.repository }}
