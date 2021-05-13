@@ -6,6 +6,7 @@ import com.github.zhgzhg.drizzle.DrizzleCLI;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import com.google.gson.GsonBuilder;
+import processing.app.BaseNoGui;
 import processing.app.Editor;
 import processing.app.PreferencesData;
 
@@ -24,6 +25,32 @@ import java.util.Map;
 
 public class UpdateUtils {
     private UpdateUtils() { }
+
+    public static String arduinoVersion() {
+        Object versionName = null;
+        try {
+            versionName = BaseNoGui.class.getDeclaredField("VERSION_NAME").get(null);
+        } catch (Exception ex) {
+            // don't care
+        }
+
+        if (versionName != null) {
+            return versionName.toString();
+        }
+
+        return "-unknown arduino version-";
+    }
+
+    public static Integer arduinoRevision() {
+        Integer revision = null;
+        try {
+            revision = BaseNoGui.class.getDeclaredField("REVISION").getInt(null);
+        } catch (Exception ex) {
+            // don't care
+        }
+
+        return revision;
+    }
 
     public static String version() {
         String implementationVersion = DrizzleCLI.class.getPackage().getImplementationVersion();
