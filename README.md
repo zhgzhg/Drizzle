@@ -38,8 +38,9 @@ An example:
 /*
  * Hello World Arduino sketch.
  *
- * This sketch depends on the libraries and settings described below. You can either manually download them via the Library Manager
- * and select the needed options by hand, or do all of the above via the "Tools -> Drizzle -> Apply Markers" menu command.
+ * This sketch depends on the libraries and settings described below. You can either manually download
+ * them via the Library Manager and select the needed options by hand, or do all of the above
+ * via the "Tools -> Drizzle -> Apply Markers" menu command.
  *
  * @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
  * @Board esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)
