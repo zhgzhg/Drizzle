@@ -38,8 +38,8 @@ An example:
 /*
  * Hello World Arduino sketch.
  *
- * This sketch depends on the libraries described below. You can either manually download them by hand via the
- * Library Manager or use the "Apply Drizzle @ Markers" command from the Tools menu.
+ * This sketch depends on the libraries and settings described below. You can either manually download them via the Library Manager
+ * and select the needed options by hand, or do all of the above via the "Tools -> Drizzle -> Apply Markers" menu command.
  *
  * @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
  * @Board esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)
@@ -100,6 +100,7 @@ Supported Markers
     * `@BoardManager Arduino AVR Boards::1.6.4`
     * `@BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json`
     * `@BoardManager esp32::>1.0.3::https://dl.espressif.com/dl/package_esp32_index.json`
+    * `@BoardManager Raspberry Pi Pico/RP2040::~1.6::https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json`
 
 
 * __@Board__ [_provider_package_name_::]_platform_name_::_board_name_
@@ -110,6 +111,7 @@ Supported Markers
     * `@Board arduino::Arduino AVR Boards::Arduino Nano`
     * `@Board esp8266::NodeMCU 1.0 (ESP-12E Module)`
     * `@Board esp32::ESP32 Dev Module`
+    * `@Board rp2040::Raspberry Pi Pico/RP2040::Raspberry Pi Pico`
 
 
 * __@DependsOn__ _library_name_::(_library_version_ | _library_uri_)
@@ -135,7 +137,7 @@ Supported Markers
 * __@BoardSettings__ _platform_name_::_board_name_::_menu_path_[->_option_][||_another_menu_path_->option]
   * Clicks on the UI options provided by a particular board (and platform)
   * __More__ than 1 marker can be used.
-  * To match all platform and/or board names a * can be used
+  * To match all platforms and/or board names a * can be used
   * To describe the path to the particular option -> can be used
   * To separate multiple menu paths || can be used
   * Menu matching is case-sensitive
