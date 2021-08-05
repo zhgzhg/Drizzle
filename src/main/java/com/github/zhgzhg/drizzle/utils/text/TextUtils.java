@@ -2,10 +2,13 @@ package com.github.zhgzhg.drizzle.utils.text;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 public class TextUtils {
     private TextUtils() {
@@ -133,5 +136,15 @@ public class TextUtils {
             }
         }
         return null;
+    }
+
+    public static String reversedCollectionToString(Collection<?> collection) {
+        if (collection == null) return "null";
+
+        return collection.stream()
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toList(),
+                        c -> { Collections.reverse(c); return c; }))
+                .toString();
     }
 }

@@ -435,7 +435,7 @@ public class Drizzle implements Tool {
         List<String> candidateVersions = possiblePlatforms.stream().map(ContributedPlatform::getParsedVersion).collect(Collectors.toList());
 
         this.logProxy.cliInfo("%s candidates: %s, required: %s%n",
-                bmSettings.platform, candidateVersions.toString(), bmSettings.version);
+                bmSettings.platform, TextUtils.reversedCollectionToString(candidateVersions), bmSettings.version);
 
         String chosenVersion = SemVer.maxSatisfying(candidateVersions, bmSettings.version);
         if (TextUtils.isNotNullOrBlank(chosenVersion)) {
@@ -565,10 +565,11 @@ public class Drizzle implements Tool {
                         .filter(lib -> libNameWithSpaces.equals(lib.getName())).collect(Collectors.toList());
             }
 
-            List<String> installCandidateVersions =
-                    installCandidates.stream().map(ContributedLibrary::getParsedVersion).collect(Collectors.toList());
+            List<String> installCandidateVersions = installCandidates.stream()
+                    .map(ContributedLibrary::getParsedVersion).collect(Collectors.toList());
 
-            this.logProxy.cliInfo("%s candidates: %s, required: %s%n", libName, installCandidateVersions.toString(), libVer);
+            this.logProxy.cliInfo("%s candidates: %s, required: %s%n",
+                    libName, TextUtils.reversedCollectionToString(installCandidateVersions), libVer);
 
             if (installLibraryFromURI(libVer)) {
                 ++installedLibrariesCount;
