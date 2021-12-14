@@ -7,6 +7,12 @@ import java.util.function.Supplier;
 
 public class LogProxy<T> {
 
+    // Mitigate log4j2 vulnerability (CVE-2021-44228), in case log4j is added to the classpath as the logger
+    // https://blog.cloudflare.com/inside-the-log4j2-vulnerability-cve-2021-44228/
+    static {
+        System.getProperties().setProperty("log4j2.formatMsgNoLookups", "true");
+    }
+
     private static final PrintStream dummyPrintStream = new PrintStream(
             new OutputStream() { @Override public void write(final int b) throws IOException { }}) { };
 
