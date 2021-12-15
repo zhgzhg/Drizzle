@@ -50,7 +50,7 @@ An example:
  * @DependsOn Arduino Cloud Provider Examples::*
  * @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
  *
- * @ArduinoTool Drizzle::(<0.13.3)::https://github.com/zhgzhg/Drizzle/releases/download/0.13.3/drizzle-0.13.3-dist.zip
+ * @ArduinoTool Drizzle::(<0.13.4)::https://github.com/zhgzhg/Drizzle/releases/download/0.13.4/drizzle-0.13.4-dist.zip
  */
 
 // Your sample code follows below just as usual
@@ -162,7 +162,7 @@ Supported Markers
   * The _tool_name_ must match the name of the directory containing the actual tool. It has to be unique. In the case of several duplicating
     names the first one will be respected.
   * Examples:
-    * `@ArduinoTool Drizzle::(<0.13.3)::https://github.com/zhgzhg/Drizzle/releases/download/0.13.3/drizzle-0.13.3-dist.zip`
+    * `@ArduinoTool Drizzle::(<0.13.4)::https://github.com/zhgzhg/Drizzle/releases/download/0.13.4/drizzle-0.13.4-dist.zip`
     * `@ArduinoTool Drizzle::*::file:///C:/Users/John/Drizzle/drizzle.zip`
     * `@ArduinoTool EspExceptionDecoder::(<=1.0.0)::https://github.com/me-no-dev/EspExceptionDecoder/releases/download/1.1.0/EspExceptionDecoder-1.1.0.zip`
 
@@ -173,7 +173,7 @@ CLI Extras
 Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
 from JSON file Drizzle markers will be produced is also supported.
 
-For e.g. `java -jar drizzle-0.13.3.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.13.4.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -212,14 +212,14 @@ For e.g. `java -jar drizzle-0.13.3.jar --parse hello-world.ino` will produce:
   },
   "arduino_ide_tools": {
     "Drizzle": {
-      "version": "(<0.13.3)",
-      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.13.3/drizzle-0.13.3-dist.zip"
+      "version": "(<0.13.4)",
+      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.13.4/drizzle-0.13.4-dist.zip"
     }
   }
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.13.3.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.13.4.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
@@ -228,7 +228,7 @@ Executing on the above JSON `java -jar drizzle-0.13.3.jar --rev-parse hello-worl
 @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
-@ArduinoTool Drizzle::(<0.13.3)::https://github.com/zhgzhg/Drizzle/releases/download/0.13.3/drizzle-0.13.3-dist.zip
+@ArduinoTool Drizzle::(<0.13.4)::https://github.com/zhgzhg/Drizzle/releases/download/0.13.4/drizzle-0.13.4-dist.zip
 ```
 
 
