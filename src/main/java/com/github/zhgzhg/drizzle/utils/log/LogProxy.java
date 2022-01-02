@@ -45,7 +45,7 @@ public class LogProxy<T> {
     public PrintStream stdnull() { return dummyPrintStream; }
 
 
-    public void cliError(String format, Object... params) { stderr().printf(format, params); }
+    public void cliError(String format, Object... params) { stderr().printf(format != null ? format : "null", params); }
 
     public void cliErrorln() { stderr().println(); }
 
@@ -53,7 +53,7 @@ public class LogProxy<T> {
 
     public void cliErrorln(Throwable t) { t.printStackTrace(stderr()); }
 
-    public void cliInfo(String format, Object... params) { stdout().printf(format, params); }
+    public void cliInfo(String format, Object... params) { stdout().printf(format != null ? format : "null", params); }
 
     public void cliInfoln() { stdout().println(); }
 
@@ -61,7 +61,7 @@ public class LogProxy<T> {
 
     public void cliInfoln(Throwable t) { t.printStackTrace(stdout()); }
 
-    public void cliWarn(String format, Object... params) { stdwarn().printf(format, params); }
+    public void cliWarn(String format, Object... params) { stdwarn().printf(format != null ? format : "null", params); }
 
     public void cliWarnln() { stdwarn().println(); }
 
