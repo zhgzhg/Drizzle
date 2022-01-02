@@ -7,6 +7,7 @@ import cc.arduino.i18n.I18NAwareMessageConsumer;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
+import processing.app.EditorConsole;
 import processing.app.debug.RunnerException;
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
@@ -20,12 +21,12 @@ import java.util.function.Consumer;
 import java.util.stream.Stream;
 
 public class CompilationInvoker {
-    private Editor editor;
-    private LogProxy logProxy;
-    private Consumer<String> compilerMessagesConsumer;
-    private Consumer<Integer> compilationProgressConsumer;
+    private final Editor editor;
+    private final LogProxy<EditorConsole> logProxy;
+    private final Consumer<String> compilerMessagesConsumer;
+    private final Consumer<Integer> compilationProgressConsumer;
 
-    public CompilationInvoker(Editor editor, LogProxy logProxy, Consumer<String> compilerMessagesConsumer,
+    public CompilationInvoker(Editor editor, LogProxy<EditorConsole> logProxy, Consumer<String> compilerMessagesConsumer,
             Consumer<Integer> compilationProgressConsumer) {
         this.editor = editor;
         this.logProxy = logProxy;
@@ -98,7 +99,7 @@ public class CompilationInvoker {
             callArduinoBuilder.invoke(compiler, targetBoard, targetBoard.getContainerPlatform(),
                     targetBoard.getContainerPlatform().getContainerPackage(), dummyVidPid, compileAction, out, err);
         } catch (Exception e) {
-            throw new RunnerException(e.getMessage());
+            throw new RunnerException(e);
         }
     }
 }

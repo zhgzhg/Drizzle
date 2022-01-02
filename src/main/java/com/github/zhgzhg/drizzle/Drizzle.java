@@ -18,6 +18,7 @@ import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
 import com.github.zhgzhg.drizzle.utils.file.FileUtils;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.log.ProgressPrinter;
+import com.github.zhgzhg.drizzle.utils.misc.MutableBoolean;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
 import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import processing.app.Base;
@@ -92,16 +93,16 @@ public class Drizzle implements Tool {
         this.uiLocator = new UILocator(editor);
         this.logProxy = new LogProxy<EditorConsole>() {
             @Override
-            public void uiError(final String format, final Object... params) { editor.statusError(String.format(format, params)); }
+            public void uiError(final String format, final Object... params) { editor.statusError(String.format(format != null ? format : "null", params)); }
 
             @Override
             public void uiError(final Throwable t) { Base.showError("Error", t.getMessage(), t); }
 
             @Override
-            public void uiWarn(final String format, final Object... params) { editor.statusNotice(String.format(format, params)); }
+            public void uiWarn(final String format, final Object... params) { editor.statusNotice(String.format(format != null ? format : "null", params)); }
 
             @Override
-            public void uiInfo(final String format, final Object... params) { editor.statusNotice(String.format(format, params)); }
+            public void uiInfo(final String format, final Object... params) { editor.statusNotice(String.format(format != null ? format : "null", params)); }
         };
 
         this.progressPrinter = new ProgressPrinter(logProxy);
@@ -123,7 +124,8 @@ public class Drizzle implements Tool {
             public void actionPerformed(final ActionEvent e) {
                 if (getPrimarySketchTabIfOpened() != null) {
                     new Thread(() -> {
-                        List<String> dependencyMarkers = autogenDependencyMarkers(e);
+                        MutableBoolean hadCompilationIssues = new MutableBoolean();
+                        List<String> dependencyMarkers = autogenDependencyMarkers(e, hadCompilationIssues);
                         List<String> boardAndSettingsMarkers = autogenBoardAndBoardSettingsMarkers(e);
 
                         boardAndSettingsMarkers.add("");
@@ -131,7 +133,12 @@ public class Drizzle implements Tool {
 
                         insertCommentBlockWithMarkersAtStartOfTheCurrentTab(boardAndSettingsMarkers);
 
-                        logProxy.cliInfoln("Marker generation is done! Don't forget to save your sketch.");
+                        if (!hadCompilationIssues.get()) {
+                            logProxy.cliInfoln("Marker generation is done! Don't forget to save your sketch.");
+                        } else {
+                            String partialErrMsg = "The compilation finished with an error! The marker generation is done, but may be incomplete!";
+                            logProxy.uiError(partialErrMsg); // the error will be displayed in the console as well
+                        }
                     }).start();
                 }
             }
@@ -185,7 +192,7 @@ public class Drizzle implements Tool {
                         logProxy.cliInfoln("Please restart the IDE in order to load the newly installed tools.");
                     }
 
-                    logProxy.cliInfo("Finished installing Arduino IDE tools.");
+                    logProxy.cliInfoln("Finished installing Arduino IDE tools.");
                 }).start();
             }
         });
@@ -771,7 +778,7 @@ public class Drizzle implements Tool {
                 + "\n *", DrizzleCLI.version(), Instant.now().toString(), MENUS_HOLDER, MENU_APPLY_MARKERS, UpdateUtils.webUrl());
     }
 
-    private List<String> autogenDependencyMarkers(final ActionEvent e) {
+    private List<String> autogenDependencyMarkers(final ActionEvent e, MutableBoolean hadCompilationIssuesFlag) {
         final Map<String, String> libs = new HashMap<>();
         Pattern libsPattern = Pattern.compile(".*-> candidates: \\[([^\\]]+)\\].*");
 
@@ -810,7 +817,8 @@ public class Drizzle implements Tool {
                 }
             }, progressVisualizer).compile();
         } catch (RunnerException runnerException) {
-            logProxy.cliError(runnerException.getMessage());
+            hadCompilationIssuesFlag.set(true);
+            logProxy.cliErrorln(runnerException);
         } finally {
             editorStatus.ifPresent(EditorStatus::unprogress);
         }
