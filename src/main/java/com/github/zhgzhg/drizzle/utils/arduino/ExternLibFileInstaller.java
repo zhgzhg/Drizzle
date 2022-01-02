@@ -9,12 +9,22 @@ import processing.app.tools.ZipDeflater;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Properties;
+import java.util.Set;
 
-public class ExternLibFileInstaller {
-    private LogProxy logProxy;
+public class ExternLibFileInstaller<T> {
+    private final LogProxy<T> logProxy;
+    private final Set<String> transitiveDependencies;
 
-    public ExternLibFileInstaller(LogProxy logProxy) {
+    public ExternLibFileInstaller(LogProxy<T> logProxy) {
         this.logProxy = logProxy;
+        this.transitiveDependencies = new LinkedHashSet<>();
     }
 
     public boolean installZipOrDirWithZips(File sourceFile) {
@@ -28,7 +38,7 @@ public class ExternLibFileInstaller {
                     ZipDeflater zipDeflater = new ZipDeflater(sourceFile, tmpFolder);
                     zipDeflater.deflate();
                     File[] foldersInTmpFolder = tmpFolder.listFiles(new OnlyDirs());
-                    if (foldersInTmpFolder.length != 1) {
+                    if (foldersInTmpFolder == null || foldersInTmpFolder.length != 1) {
                         throw new IOException("Zip doesn't contain a library");
                     }
                     sourceFile = foldersInTmpFolder[0];
@@ -51,8 +61,8 @@ public class ExternLibFileInstaller {
 
             String libName = libFolder.getName();
             if (!BaseNoGui.isSanitaryName(libName)) {
-                this.logProxy.cliError("Cannot use library '%s'.%nLibrary names must contain only basic letters and numbers.%n"
-                        + "(ASCII only and no spaces, and it cannot start with a number)%n", libName);
+                this.logProxy.cliError("Cannot use library '%s'.%nLibrary names must contain only basic letters and numbers.%n" +
+                        "(ASCII only and no spaces, and it cannot start with a number)%n", libName);
                 return false;
             }
 
@@ -67,6 +77,18 @@ public class ExternLibFileInstaller {
             if (headers.length == 0) {
                 this.logProxy.cliError("Directory/zip file '%s' does not contain a valid library%n", sourceFile.toString());
                 return false;
+            }
+
+            if (libProp.exists()) {
+                try (InputStream propStream = Files.newInputStream(libProp.toPath(), StandardOpenOption.READ)) {
+                    Properties properties = new Properties();
+                    properties.load(propStream);
+                    List<String> dependencies = Arrays.asList(properties.getProperty("depends", "").split(",\\s*"));
+                    dependencies.remove("");
+                    this.transitiveDependencies.addAll(dependencies);
+                } catch (Exception e) {
+                    this.logProxy.cliErrorln(e);
+                }
             }
 
             // copy folder
@@ -95,5 +117,13 @@ public class ExternLibFileInstaller {
 
     public void logSuccessfullyInstalledLib(String libName) {
         this.logProxy.cliInfo("Successfully added library %s!%n", libName);
+    }
+
+    public Set<String> getTransitiveDependencies() {
+        return transitiveDependencies;
+    }
+
+    public void cleanTransitiveDependenciesInfo() {
+        this.transitiveDependencies.clear();
     }
 }

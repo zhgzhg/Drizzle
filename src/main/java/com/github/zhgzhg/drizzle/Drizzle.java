@@ -14,12 +14,12 @@ import com.github.zhgzhg.drizzle.utils.arduino.ArduinoIDEToolsInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
+import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
 import com.github.zhgzhg.drizzle.utils.file.FileUtils;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.log.ProgressPrinter;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
 import com.github.zhgzhg.drizzle.utils.text.TextUtils;
-import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
 import processing.app.Base;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
@@ -52,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -571,7 +572,7 @@ public class Drizzle implements Tool {
             this.logProxy.cliInfo("%s - required: %s, candidates: %s%n", libName, libVer,
                     TextUtils.reversedCollectionToString(installCandidateVersions));
 
-            if (installLibraryFromURI(libVer)) {
+            if (installLibraryFromURI(libName, libVer)) {
                 ++installedLibrariesCount;
                 continue;
             }
@@ -580,11 +581,11 @@ public class Drizzle implements Tool {
             if (TextUtils.isNotNullOrBlank(chosenVersion)) {
                 int libIndex = installCandidateVersions.indexOf(chosenVersion);
                 ContributedLibrary l = installCandidates.get(libIndex);
-                this.logProxy.cliInfo("Picked library version %s%n", l.getParsedVersion());
+                this.logProxy.cliInfo("Picked %s version %s%n", libName, l.getParsedVersion());
                 librariesToInstall.add(l);
             } else {
                 if (BaseNoGui.librariesIndexer.getInstalledLibraries().getByName(libName) == null) {
-                    this.logProxy.cliError("Failed to pick version for library %s, expression %s%n", libName, libVer);
+                    this.logProxy.cliError("Failed to pick version for %s, expression %s%n", libName, libVer);
                 } else {
                     this.logProxy.cliInfo("Picked core library %s%n", libName);
                 }
@@ -592,20 +593,17 @@ public class Drizzle implements Tool {
         }
 
         this.logProxy.cliInfo("Installing libraries...");
+
+        List<ContributedLibrary> missingNotInstalledTransitiveDependencies;
         try {
             this.progressPrinter.begin(1, 5, 80, ".");
             this.libraryInstaller.install(librariesToInstall, this.progressListener);
 
-            for (ContributedLibrary lib : librariesToInstall) {
-                List<ContributedLibrary> deps = BaseNoGui.librariesIndexer.getIndex().resolveDependeciesOf(lib);
-                boolean depsInstalled = deps.stream().allMatch((l) -> {
-                    return l.getInstalledLibrary().isPresent() || l.getName().equals(lib.getName());
-                });
+            missingNotInstalledTransitiveDependencies = librariesToInstall.stream()
+                    .map(BaseNoGui.librariesIndexer.getIndex()::resolveDependeciesOf)
+                    .flatMap(transitiveDeps -> transitiveDeps.stream().filter(dep -> !dep.getInstalledLibrary().isPresent()))
+                    .collect(Collectors.toList());
 
-                // install all dependencies
-                this.libraryInstaller.install(deps, progressListener);
-            }
-            
             this.uiLocator.sketchIncludeLibraryMenu().ifPresent(im -> Base.INSTANCE.rebuildImportMenu(im));
             this.uiLocator.filesExamplesMenu().ifPresent(em -> Base.INSTANCE.rebuildExamplesMenu(em));
         } catch (Exception e) {
@@ -616,10 +614,22 @@ public class Drizzle implements Tool {
         this.logProxy.cliInfoln(" done:");
         librariesToInstall.forEach(l -> logProxy.cliInfo("  %s %s%n", l.getName(), l.getParsedVersion()));
 
-        return librariesToInstall.size() + installedLibrariesCount;
+        int missingNotInstalledTransitiveDependenciesCount = 0;
+        if (missingNotInstalledTransitiveDependencies != null && !missingNotInstalledTransitiveDependencies.isEmpty()) {
+            missingNotInstalledTransitiveDependenciesCount = missingNotInstalledTransitiveDependencies.size();
+            this.logProxy.cliError(
+                    "Check your %s dependency list! The following transitive dependencies are not installed:%n", MENUS_HOLDER);
+            missingNotInstalledTransitiveDependencies.forEach(transDep -> this.logProxy.cliErrorln(" - " + transDep.getName()
+                    + ", possibly version " + transDep.getParsedVersion())
+            );
+
+            this.logProxy.uiWarn("Please add the missing transitive dependencies to your Drizzle list!");
+        }
+
+        return librariesToInstall.size() + installedLibrariesCount - missingNotInstalledTransitiveDependenciesCount;
     }
 
-    private boolean installLibraryFromURI(String libUri) {
+    private boolean installLibraryFromURI(String libName, String libUri) {
         if (libUri == null || "*".equals(libUri) || !libUri.contains("://")) return false;
 
         URL url;
@@ -647,9 +657,11 @@ public class Drizzle implements Tool {
             File tempFile = fileUtils.downloadZip(url, "-lib");
 
             if (tempFile != null) {
-                ExternLibFileInstaller installer = new ExternLibFileInstaller(this.logProxy);
+                ExternLibFileInstaller<EditorConsole> installer = new ExternLibFileInstaller<EditorConsole>(this.logProxy);
                 if (installer.installZipOrDirWithZips(tempFile)) {
                     installer.logSuccessfullyInstalledLib(libUri);
+                    BaseNoGui.librariesIndexer.rescanLibraries();
+                    logURILibNotInstalledTransitiveDependencies(libName, installer);
                 }
             }
 
@@ -661,12 +673,29 @@ public class Drizzle implements Tool {
         this.logProxy.cliInfo("URI detected! Picked %s%n", libUri);
         File f = new File(uri);
 
-        ExternLibFileInstaller installer = new ExternLibFileInstaller(this.logProxy);
+        ExternLibFileInstaller<EditorConsole> installer = new ExternLibFileInstaller<EditorConsole>(this.logProxy);
         if (installer.installZipOrDirWithZips(f)) {
             installer.logSuccessfullyInstalledLib(libUri);
+            BaseNoGui.librariesIndexer.rescanLibraries();
+            logURILibNotInstalledTransitiveDependencies(libName, installer);
         }
 
         return true;
+    }
+
+    private void logURILibNotInstalledTransitiveDependencies(String libName, ExternLibFileInstaller<EditorConsole> installer) {
+        Set<String> transitiveDependencies = installer.getTransitiveDependencies()
+                .stream()
+                .map(BaseNoGui.librariesIndexer.getIndex()::find)
+                .filter(contributedLibraries -> contributedLibraries.stream().allMatch(cl -> !cl.isLibraryInstalled()))
+                .map(contributedLibraries -> contributedLibraries.get(0).getName())
+                .collect(Collectors.toSet());
+
+        if (!transitiveDependencies.isEmpty()) {
+            this.logProxy.cliError("%s depends transitively on the following not installed libraries:%n", libName);
+            transitiveDependencies.forEach(td -> this.logProxy.cliErrorln(" - " + td));
+            this.logProxy.uiWarn("Please add the missing transitive dependencies to your Drizzle list!");
+        }
     }
 
     private int selectBoardOptions() {
