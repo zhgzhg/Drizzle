@@ -434,8 +434,8 @@ public class Drizzle implements Tool {
 
         List<String> candidateVersions = possiblePlatforms.stream().map(ContributedPlatform::getParsedVersion).collect(Collectors.toList());
 
-        this.logProxy.cliInfo("%s candidates: %s, required: %s%n",
-                bmSettings.platform, TextUtils.reversedCollectionToString(candidateVersions), bmSettings.version);
+        this.logProxy.cliInfo("%s - required: %s, candidates: %s%n", bmSettings.platform, bmSettings.version,
+                TextUtils.reversedCollectionToString(candidateVersions));
 
         String chosenVersion = SemVer.maxSatisfying(candidateVersions, bmSettings.version);
         if (TextUtils.isNotNullOrBlank(chosenVersion)) {
@@ -568,8 +568,8 @@ public class Drizzle implements Tool {
             List<String> installCandidateVersions = installCandidates.stream()
                     .map(ContributedLibrary::getParsedVersion).collect(Collectors.toList());
 
-            this.logProxy.cliInfo("%s candidates: %s, required: %s%n",
-                    libName, TextUtils.reversedCollectionToString(installCandidateVersions), libVer);
+            this.logProxy.cliInfo("%s - required: %s, candidates: %s%n", libName, libVer,
+                    TextUtils.reversedCollectionToString(installCandidateVersions));
 
             if (installLibraryFromURI(libVer)) {
                 ++installedLibrariesCount;
@@ -594,8 +594,18 @@ public class Drizzle implements Tool {
         this.logProxy.cliInfo("Installing libraries...");
         try {
             this.progressPrinter.begin(1, 5, 80, ".");
-            this.libraryInstaller.install(librariesToInstall, progressListener);
+            this.libraryInstaller.install(librariesToInstall, this.progressListener);
 
+            for (ContributedLibrary lib : librariesToInstall) {
+                List<ContributedLibrary> deps = BaseNoGui.librariesIndexer.getIndex().resolveDependeciesOf(lib);
+                boolean depsInstalled = deps.stream().allMatch((l) -> {
+                    return l.getInstalledLibrary().isPresent() || l.getName().equals(lib.getName());
+                });
+
+                // install all dependencies
+                this.libraryInstaller.install(deps, progressListener);
+            }
+            
             this.uiLocator.sketchIncludeLibraryMenu().ifPresent(im -> Base.INSTANCE.rebuildImportMenu(im));
             this.uiLocator.filesExamplesMenu().ifPresent(em -> Base.INSTANCE.rebuildExamplesMenu(em));
         } catch (Exception e) {
