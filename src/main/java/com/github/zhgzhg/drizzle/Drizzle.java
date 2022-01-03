@@ -15,6 +15,7 @@ import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
 import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
+import com.github.zhgzhg.drizzle.utils.collection.CollectionUtils;
 import com.github.zhgzhg.drizzle.utils.file.FileUtils;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.log.ProgressPrinter;
@@ -46,9 +47,12 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -579,7 +583,7 @@ public class Drizzle implements Tool {
             this.logProxy.cliInfo("%s - required: %s, candidates: %s%n", libName, libVer,
                     TextUtils.reversedCollectionToString(installCandidateVersions));
 
-            if (installLibraryFromURI(libName, libVer)) {
+            if (installLibraryFromURI(libName, libVer, requiredLibs.keySet())) {
                 ++installedLibrariesCount;
                 continue;
             }
@@ -601,15 +605,50 @@ public class Drizzle implements Tool {
 
         this.logProxy.cliInfo("Installing libraries...");
 
-        List<ContributedLibrary> missingNotInstalledTransitiveDependencies;
+        Set<ContributedLibrary> missingTransitiveDependencies = new LinkedHashSet<>();
+        Set<ContributedLibrary> missingNotInstalledTransitiveDependencies = new LinkedHashSet<>();
+        Map<ContributedLibrary, Set<ContributedLibrary>> transitiveDependencyRequiredBy = new HashMap<>();
+
         try {
             this.progressPrinter.begin(1, 5, 80, ".");
             this.libraryInstaller.install(librariesToInstall, this.progressListener);
 
-            missingNotInstalledTransitiveDependencies = librariesToInstall.stream()
-                    .map(BaseNoGui.librariesIndexer.getIndex()::resolveDependeciesOf)
-                    .flatMap(transitiveDeps -> transitiveDeps.stream().filter(dep -> !dep.getInstalledLibrary().isPresent()))
-                    .collect(Collectors.toList());
+            librariesToInstall.stream()
+                    .map(lib -> new AbstractMap.SimpleEntry<>(lib, BaseNoGui.librariesIndexer.getIndex().resolveDependeciesOf(lib)))
+                    .filter(deps -> deps.getValue() != null && !deps.getValue().isEmpty())
+                    .forEach(libAndDeps -> libAndDeps.getValue().stream().forEach(dep -> {
+                            if (!dep.getInstalledLibrary().isPresent()) {
+                                missingNotInstalledTransitiveDependencies.add(dep);
+                                transitiveDependencyRequiredBy
+                                        .compute(dep, (dependency, origin) -> origin == null ? new LinkedHashSet<>() : origin)
+                                        .add(libAndDeps.getKey());
+                            }
+
+                            if (!librariesToInstall.stream().anyMatch(lib -> lib.getName().equals(dep.getName()))) {
+                                missingTransitiveDependencies.add(dep);
+                                transitiveDependencyRequiredBy
+                                        .compute(dep, (dependency, origin) -> origin == null ? new LinkedHashSet<>() : origin)
+                                        .add(libAndDeps.getKey());
+                            }
+                        })
+                    );
+
+            String currBoardArch = BaseNoGui.getTargetBoard().getContainerPlatform().getId();
+
+            for (Iterator<Map.Entry<ContributedLibrary, Set<ContributedLibrary>>> it = transitiveDependencyRequiredBy.entrySet().iterator();
+                    it.hasNext(); ) {
+
+                Map.Entry<ContributedLibrary, Set<ContributedLibrary>> libAndRequirement = it.next();
+                List<String> libArchitectures = libAndRequirement.getKey().getArchitectures();
+
+                if (!libArchitectures.isEmpty() && !libArchitectures.contains("*")
+                        && !libArchitectures.contains(currBoardArch)) {
+
+                    missingTransitiveDependencies.remove(libAndRequirement.getKey());
+                    missingNotInstalledTransitiveDependencies.remove(libAndRequirement.getKey());
+                    it.remove();
+                }
+            }
 
             this.uiLocator.sketchIncludeLibraryMenu().ifPresent(im -> Base.INSTANCE.rebuildImportMenu(im));
             this.uiLocator.filesExamplesMenu().ifPresent(em -> Base.INSTANCE.rebuildExamplesMenu(em));
@@ -621,22 +660,40 @@ public class Drizzle implements Tool {
         this.logProxy.cliInfoln(" done:");
         librariesToInstall.forEach(l -> logProxy.cliInfo("  %s %s%n", l.getName(), l.getParsedVersion()));
 
-        int missingNotInstalledTransitiveDependenciesCount = 0;
-        if (missingNotInstalledTransitiveDependencies != null && !missingNotInstalledTransitiveDependencies.isEmpty()) {
-            missingNotInstalledTransitiveDependenciesCount = missingNotInstalledTransitiveDependencies.size();
+        if (!missingNotInstalledTransitiveDependencies.isEmpty()) {
             this.logProxy.cliError(
                     "Check your %s dependency list! The following transitive dependencies are not installed:%n", MENUS_HOLDER);
-            missingNotInstalledTransitiveDependencies.forEach(transDep -> this.logProxy.cliErrorln(" - " + transDep.getName()
-                    + ", possibly version " + transDep.getParsedVersion())
+            missingNotInstalledTransitiveDependencies.forEach(transDep -> this.logProxy.cliError(
+                    " - %s, possibly version %s, introduced by: %s%n", transDep.getName(), transDep.getParsedVersion(),
+                    this.introducingTransitiveDependencyLibsToString(transitiveDependencyRequiredBy, transDep))
             );
-
-            this.logProxy.uiWarn("Please add the missing transitive dependencies to your Drizzle list!");
+            this.logProxy.uiWarn("Please add the missing transitive dependencies to your %s list.", MENUS_HOLDER);
+        }
+        if (!missingTransitiveDependencies.isEmpty()) {
+            this.logProxy.cliError("The following transitive dependencies are not listed in your project:%n");
+            missingTransitiveDependencies.forEach(transDep -> this.logProxy.cliError(" - %s, possiblly version %s, introduced by: %s%n",
+                    transDep.getName(), transDep.getParsedVersion(),
+                    this.introducingTransitiveDependencyLibsToString(transitiveDependencyRequiredBy, transDep))
+            );
+            this.logProxy.uiWarn("Please add the missing transitive dependencies to your %s list.", MENUS_HOLDER);
         }
 
-        return librariesToInstall.size() + installedLibrariesCount - missingNotInstalledTransitiveDependenciesCount;
+        return librariesToInstall.size() + installedLibrariesCount - missingNotInstalledTransitiveDependencies.size();
     }
 
-    private boolean installLibraryFromURI(String libName, String libUri) {
+    private String introducingTransitiveDependencyLibsToString(
+            Map<ContributedLibrary, Set<ContributedLibrary>> transDepAndIntroducers, ContributedLibrary transDep) {
+
+        if (transDepAndIntroducers == null || transDep == null || !transDepAndIntroducers.containsKey(transDep)
+                || CollectionUtils.isNullOrEmpty(transDepAndIntroducers.get(transDep))) {
+            return "[ -no data- ]";
+        }
+
+        return "[ " + transDepAndIntroducers.get(transDep).stream().map(ContributedLibrary::getName)
+                .collect(Collectors.joining(", ")) + " ]";
+    }
+
+    private boolean installLibraryFromURI(String libName, String libUri, Set<String> allRequiredLibNames) {
         if (libUri == null || "*".equals(libUri) || !libUri.contains("://")) return false;
 
         URL url;
@@ -668,7 +725,7 @@ public class Drizzle implements Tool {
                 if (installer.installZipOrDirWithZips(tempFile)) {
                     installer.logSuccessfullyInstalledLib(libUri);
                     BaseNoGui.librariesIndexer.rescanLibraries();
-                    logURILibNotInstalledTransitiveDependencies(libName, installer);
+                    logURILibNotInstalledOrUnlistedTransitiveDependencies(libName, installer, allRequiredLibNames);
                 }
             }
 
@@ -684,24 +741,42 @@ public class Drizzle implements Tool {
         if (installer.installZipOrDirWithZips(f)) {
             installer.logSuccessfullyInstalledLib(libUri);
             BaseNoGui.librariesIndexer.rescanLibraries();
-            logURILibNotInstalledTransitiveDependencies(libName, installer);
+            logURILibNotInstalledOrUnlistedTransitiveDependencies(libName, installer, allRequiredLibNames);
         }
 
         return true;
     }
 
-    private void logURILibNotInstalledTransitiveDependencies(String libName, ExternLibFileInstaller<EditorConsole> installer) {
-        Set<String> transitiveDependencies = installer.getTransitiveDependencies()
-                .stream()
+    private void logURILibNotInstalledOrUnlistedTransitiveDependencies(
+            String libName, ExternLibFileInstaller<EditorConsole> installer, Set<String> allRequiredLibNames) {
+
+        String currBoardArch = BaseNoGui.getTargetBoard().getContainerPlatform().getId();
+
+        Set<String> notInstalledTransitiveDependencies = installer.getTransitiveDependencies().stream()
                 .map(BaseNoGui.librariesIndexer.getIndex()::find)
-                .filter(contributedLibraries -> contributedLibraries.stream().allMatch(cl -> !cl.isLibraryInstalled()))
+                .filter(contributedLibraries -> contributedLibraries.stream()
+                        .allMatch(cl -> !cl.isLibraryInstalled() && !cl.getArchitectures().isEmpty() && !cl.getArchitectures().contains("*")
+                                && !cl.getArchitectures().contains(currBoardArch))
+                )
                 .map(contributedLibraries -> contributedLibraries.get(0).getName())
                 .collect(Collectors.toSet());
 
-        if (!transitiveDependencies.isEmpty()) {
+        if (!notInstalledTransitiveDependencies.isEmpty()) {
             this.logProxy.cliError("%s depends transitively on the following not installed libraries:%n", libName);
-            transitiveDependencies.forEach(td -> this.logProxy.cliErrorln(" - " + td));
-            this.logProxy.uiWarn("Please add the missing transitive dependencies to your Drizzle list!");
+            notInstalledTransitiveDependencies.forEach(td -> this.logProxy.cliErrorln(" - " + td));
+            this.logProxy.uiWarn("Please add the missing transitive dependencies to your Drizzle list.");
+        }
+
+        Set<String> unlistedTransitiveDependencies = installer.getTransitiveDependencies().stream()
+                .filter(missingLib -> !(allRequiredLibNames != null && (allRequiredLibNames.contains(missingLib)
+                        || allRequiredLibNames.contains(missingLib.replace(' ', '_'))))
+                )
+                .collect(Collectors.toSet());
+        if (!unlistedTransitiveDependencies.isEmpty()) {
+            this.logProxy.cliError(
+                    "%s depends transitively on the following unlisted in your %s settings libraries:%n", libName, MENUS_HOLDER);
+            unlistedTransitiveDependencies.forEach(td -> this.logProxy.cliErrorln(" - " + td));
+            this.logProxy.uiWarn("Please add the missing transitive dependencies to your Drizzle list.");
         }
     }
 

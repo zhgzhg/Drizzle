@@ -20,10 +20,10 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-public class FileUtils {
-    private final LogProxy logProxy;
+public class FileUtils<T> {
+    private final LogProxy<T> logProxy;
 
-    public FileUtils(LogProxy logProxy) {
+    public FileUtils(LogProxy<T> logProxy) {
         this.logProxy = logProxy;
     }
 

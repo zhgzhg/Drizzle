@@ -5,6 +5,7 @@ import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
+import processing.app.EditorConsole;
 
 import java.io.File;
 import java.io.IOException;
@@ -19,9 +20,9 @@ import java.util.jar.JarFile;
 public class ArduinoIDEToolsInstaller {
     private final Path drizzleJarLocation;
     private final Path ideToolsDir;
-    private final LogProxy logProxy;
+    private final LogProxy<EditorConsole> logProxy;
 
-    public ArduinoIDEToolsInstaller(LogProxy logProxy) {
+    public ArduinoIDEToolsInstaller(LogProxy<EditorConsole> logProxy) {
         this.logProxy = logProxy;
         this.drizzleJarLocation = Paths.get(URI.create("file://" + this.getClass().getProtectionDomain().getCodeSource().getLocation().getPath()));
         this.ideToolsDir = this.drizzleJarLocation.getParent().getParent().getParent().toAbsolutePath();
@@ -46,7 +47,7 @@ public class ArduinoIDEToolsInstaller {
 
     public String extractInstalledToolVersion(String toolName) {
 
-        FileUtils fileUtils = new FileUtils(this.logProxy);
+        FileUtils<EditorConsole> fileUtils = new FileUtils<>(this.logProxy);
 
         List<Path> jars = fileUtils.listJarsInDir(this.ideToolsDir.resolve(toolName).resolve("tool"));
         if (jars.isEmpty()) return null;
@@ -100,7 +101,7 @@ public class ArduinoIDEToolsInstaller {
             return false;
         }
 
-        FileUtils fileUtils = new FileUtils(this.logProxy);
+        FileUtils<EditorConsole> fileUtils = new FileUtils<>(this.logProxy);
         File tempFile = fileUtils.downloadZip(toolLocation, "-ardtool");
 
         if (tempFile == null || !tempFile.exists()) {
@@ -135,7 +136,11 @@ public class ArduinoIDEToolsInstaller {
         new Thread(() -> {
             try {
                 for (long j = afterSeconds; j > 0; --j) {
-                    System.err.printf(".............%d.............%n", j);
+                    try {
+                        logProxy.uiError(".............%d.............%n", j);
+                    } catch (Exception e) {
+                        System.err.printf(".............%d.............%n", j);
+                    }
                     Thread.sleep( 1000);
                 }
                 System.err.println("..........JVM STOP...........%n");
