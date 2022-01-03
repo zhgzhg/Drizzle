@@ -18,6 +18,7 @@ import java.net.HttpURLConnection;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -82,7 +83,7 @@ public class UpdateUtils {
             connection.disconnect();
 
             return new GsonBuilder().create().fromJson(content.toString(), Map.class);
-        } catch (SocketTimeoutException e) {
+        } catch (SocketTimeoutException | UnknownHostException e) {
             // don't pollute with unnecessary errors
         } catch (Exception e) {
             e.printStackTrace(System.err);

@@ -137,10 +137,11 @@ public class ArduinoIDEToolsInstaller {
             try {
                 for (long j = afterSeconds; j > 0; --j) {
                     try {
-                        logProxy.uiError(".............%d.............%n", j);
+                        logProxy.uiWarn(".............%d............. seconds until Arduino IDE shuts down", j);
                     } catch (Exception e) {
-                        System.err.printf(".............%d.............%n", j);
+                        // don't care
                     }
+                    System.err.printf(".............%d.............%n", j);
                     Thread.sleep( 1000);
                 }
                 System.err.println("..........JVM STOP...........%n");
