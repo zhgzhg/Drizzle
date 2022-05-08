@@ -494,7 +494,10 @@ public class Drizzle implements Tool {
             } catch (Exception e) {
                 if (e.getMessage() != null && e.getMessage().contains("Can't extract file")
                         && e.getMessage().contains(", file already exists!")) {
-                    this.logProxy.cliInfoln(" done!");
+
+                    this.logProxy.cliWarn(" done, but with extraction errors - %s\n"
+                            + "\t(You may need to delete the whole platform package if the board is unavailable in the UI.)\n", e.getMessage());
+                    this.logProxy.uiWarn("Platform extraction error occured: %s", e.getMessage());
                 } else {
                     this.logProxy.cliErrorln();
                     this.logProxy.cliErrorln(e);
