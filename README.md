@@ -1,6 +1,6 @@
 Drizzle
 =======
-Extended dependency manager for Arduino IDE [v1.8.x](https://github.com/arduino/Arduino).
+Advanced package manager for Arduino IDE [v1.8.x](https://github.com/arduino/Arduino).
 
 <img alt="Drizzle" src="https://raw.githubusercontent.com/zhgzhg/Drizzle/master/drizzle-logo.svg?sanitize=true" />
 
@@ -12,7 +12,7 @@ settings or compiling them on different environments has never been easier!
 
 Drizzle operates on top of Arduino IDE's library and board manager. It enables them to provide components, which now can be described in
 text form. Because the only change in the sketch is the addition of a few _comments_ or editing _a separate JSON file_, the sketch will
-remain compatible with other Arduino IDEs that don't have Drizzle installed.
+remain compatible with Arduino IDEs which don't have Drizzle installed.
 
 
 How to Use
@@ -77,8 +77,7 @@ Using and combining Drizzle's markers is always optional.
 Alternative Usage
 -----------------
 
-Alternative to using the Arduino's main sketch file comments to describe dependencies and settings can be the __drizzle.json__ file next
-to it. In this case __drizzle.json__ will be the only source of settings and any Drizzle markers found in the source code will be ignored.
+The __drizzle.json__ file can be used an alternative to the annotated comments the main sketch file, if is placed next to it, for describing dependencies and settings. In this case __drizzle.json__ becomes the only settings/dependencies source, and any Drizzle markers found in the source code will be ignored.
 
 An example for __drizzle.json__ can read in the [CLI Extras](#cli-extras) section.
  
