@@ -1,6 +1,6 @@
 Drizzle
 =======
-Declarative package manager for Arduino IDE [v1.8.x](https://github.com/arduino/Arduino).
+Declarative package manager plugin for Arduino IDE [v1.8.x](https://github.com/arduino/Arduino).
 
 <img alt="Drizzle" src="https://raw.githubusercontent.com/zhgzhg/Drizzle/master/drizzle-logo.svg?sanitize=true" />
 
@@ -82,12 +82,20 @@ The __drizzle.json__ file can be used instead of the annotated comments in the m
 An example for __drizzle.json__ can read in the [CLI Extras](#cli-extras) section.
  
 
-How To Install
+How to Install
 --------------
 
 1. Download the "-dist" ZIP file from the [Releases](https://github.com/zhgzhg/Drizzle/releases)' assets.
 2. Unzip it inside **Arduino's installation directory** / **tools**
 3. Restart Arduino IDE
+
+
+How to Update
+-------------
+
+When Arduino IDE is opened, Drizzle will automatically check for newer version, and will offer a semi-automatic update process - once downloaded, the IDE will be closed. The next time you open it, the latest version of Drizzle will be fully installed.
+
+For a manual update follow the steps in [How to Install](#how-to-Install) .
 
 
 Supported Markers
@@ -228,7 +236,7 @@ Executing on the above JSON `java -jar drizzle-0.14.3.jar --rev-parse hello-worl
 @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
-@ArduinoTool Drizzle::(<0.14.3)::https://github.com/zhgzhg/Drizzle/releases/download/0.14.2/drizzle-0.14.2-dist.zip
+@ArduinoTool Drizzle::(<0.14.3)::https://github.com/zhgzhg/Drizzle/releases/download/0.14.3/drizzle-0.14.3-dist.zip
 ```
 
 
