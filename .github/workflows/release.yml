@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
@@ -19,7 +19,7 @@ jobs:
         run: echo ::set-output name=tag::${GITHUB_REF:10}
 
       - name: Setup Java JDK
-        uses: actions/setup-java@v2
+        uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: '8'
@@ -38,44 +38,16 @@ jobs:
           mv ./target/*-with-deps.jar ./Drizzle/tool
           cp README.md ./Drizzle
           cp LICENSE ./Drizzle
-          zip -9r drizzle.zip ./Drizzle
+          zip -9r drizzle-${{ steps.vars.outputs.tag }}-dist.zip ./Drizzle
           rm -fr ./Drizzle
-
-      - name: Prepare for Changelog Generation
-        run: |
-          echo -n '{"name": "Drizzle", "version":"' >package.json
-          echo -n ${{ steps.vars.outputs.tag }} >>package.json
-          echo '"}' >>package.json
-
-      - name: Generate Changelog
-        uses: scottbrenner/generate-changelog-action@v1.3.3
-        id: Changelog
-        env:
-          REPO: ${{ github.repository }}
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1.1.4
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Drizzle ${{ github.ref }}
-          body: |
-            To install Drizzle ${{ steps.vars.outputs.tag }} unzip it inside Arduino IDE's installation directory / tools
-            If you have a previous version already installed remove it from the tools directory.
-
-            ${{ steps.Changelog.outputs.changelog }}
-          draft: false
-          prerelease: false
-
-      - name: Add archive asset to the release
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1.0.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: drizzle.zip
-          asset_name: drizzle-${{ steps.vars.outputs.tag }}-dist.zip
-          asset_content_type: application/zip
+        run: |
+          gh release create "${{ github.ref_name }}" -t "Drizzle ${{ github.ref_name }}" --generate-notes drizzle-${{ steps.vars.outputs.tag }}-dist.zip
+          echo -e "To install Drizzle ${{ steps.vars.outputs.tag }} unzip it inside Arduino IDE's installation directory / tools\nIf you have a previous version already installed remove it from the tools directory.\n\n" >release_notes.txt
+          gh release view "${{ github.ref_name }}" -t {{.body}} --json body >>release_notes.txt
+          gh release edit "${{ github.ref_name }}" -F release_notes.txt
+          rm release_notes.txt

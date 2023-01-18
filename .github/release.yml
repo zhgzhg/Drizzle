@@ -1,0 +1,22 @@
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: Breaking Changes 🛠
+      labels:
+        - breaking
+        - breaking-change
+    - title: Exciting New Features 🎉
+      labels:
+        - feat
+        - enhancement
+    - title: Fixes 🔨
+      labels:
+        - fix
+        - perf
+        - refactor
+        - revert
+    - title: Other Changes
+      labels:
+        - "*"
