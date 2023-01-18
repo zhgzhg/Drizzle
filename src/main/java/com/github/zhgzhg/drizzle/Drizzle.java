@@ -636,7 +636,16 @@ public class Drizzle implements Tool {
                         })
                     );
 
-            String currBoardArch = BaseNoGui.getTargetBoard().getContainerPlatform().getId();
+            String currBoardArch = Optional.ofNullable(BaseNoGui.getTargetBoard())
+                    .map(TargetBoard::getContainerPlatform)
+                    .map(TargetPlatform::getId)
+                    .orElse(null);
+            if (TextUtils.isNullOrBlank(currBoardArch)) {
+                String error = "Cannot determine the target board / platform / architecture!\nThis may indicate a missing or corrupted board package.";
+                this.logProxy.cliErrorln(error);
+                this.logProxy.uiError(error);
+                return -1;
+            }
 
             for (Iterator<Map.Entry<ContributedLibrary, Set<ContributedLibrary>>> it = transitiveDependencyRequiredBy.entrySet().iterator();
                     it.hasNext(); ) {
@@ -658,7 +667,7 @@ public class Drizzle implements Tool {
         } catch (Exception e) {
             this.logProxy.cliErrorln(e);
             this.logProxy.uiError(e.getMessage());
-            return -1;
+            return -2;
         }
         this.logProxy.cliInfoln(" done:");
         librariesToInstall.forEach(l -> logProxy.cliInfo("  %s %s%n", l.getName(), l.getParsedVersion()));
@@ -753,7 +762,16 @@ public class Drizzle implements Tool {
     private void logURILibNotInstalledOrUnlistedTransitiveDependencies(
             String libName, ExternLibFileInstaller<EditorConsole> installer, Set<String> allRequiredLibNames) {
 
-        String currBoardArch = BaseNoGui.getTargetBoard().getContainerPlatform().getId();
+        String currBoardArch = Optional.ofNullable(BaseNoGui.getTargetBoard())
+                .map(TargetBoard::getContainerPlatform)
+                .map(TargetPlatform::getId)
+                .orElse(null);
+        if (TextUtils.isNullOrBlank(currBoardArch)) {
+            String error = "Cannot determine the target board / platform / architecture!\nThis may indicate a missing or corrupted board package.";
+            this.logProxy.cliErrorln(error);
+            this.logProxy.uiError(error);
+            return;
+        }
 
         Set<String> notInstalledTransitiveDependencies = installer.getTransitiveDependencies().stream()
                 .map(BaseNoGui.librariesIndexer.getIndex()::find)
