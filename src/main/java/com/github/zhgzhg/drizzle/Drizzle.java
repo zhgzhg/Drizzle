@@ -348,7 +348,7 @@ public class Drizzle implements Tool {
                 )
                 .map(contribPlatf -> BaseNoGui.getTargetPlatform(contribPlatf.getParentPackage().getName(), contribPlatf.getArchitecture()))
                 .flatMap(targetPlatform -> targetPlatform.getBoards().values().stream())
-                .filter(targtBrd -> board.name.equals(targtBrd.getName()))
+                .filter(targtBrd -> board.name.equals(targtBrd.getId()) || board.name.equals(targtBrd.getName()))
                 .findFirst()
                 .orElse(null);
 
@@ -364,7 +364,7 @@ public class Drizzle implements Tool {
                     .flatMap(targPlatf ->
                             targPlatf.getBoards().values().stream())
                     .filter(targtBrd ->
-                            board.name.equals(targtBrd.getName()))
+                            board.name.equals(targtBrd.getId()) || board.name.equals(targtBrd.getName()))
                     .findFirst()
                     .orElse(null);
         }
@@ -817,10 +817,12 @@ public class Drizzle implements Tool {
 
         String targetPlatformName = (targetPlatform != null ? targetPlatform.getId() : null);
         String targetBoardName = (targetBoard != null ? targetBoard.getName() : null);
+        String targetBoardId = (targetBoard != null ? targetBoard.getId() : null);
 
         List<SourceExtractor.BoardSettings> settingsToClick =
                 this.sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source).stream()
-                        .filter(boardSettings -> boardSettings.suitsRequirements(targetPlatformName, targetBoardName))
+                        .filter(boardSettings -> boardSettings.suitsRequirements(targetPlatformName, targetBoardId)
+                                || boardSettings.suitsRequirements(targetPlatformName, targetBoardName))
                         .collect(Collectors.toList());
 
         int clickedItems = 0;
@@ -949,7 +951,7 @@ public class Drizzle implements Tool {
 
         String providerPackageName = PreferencesData.get("target_package", null);
         String platformName = PreferencesData.get("target_platform", null);
-        String boardName = TextUtils.unquotedValueFromLabelPair(boardMenu != null ? boardMenu.getText() : null);
+        String boardName = PreferencesData.get("board", TextUtils.unquotedValueFromLabelPair(boardMenu != null ? boardMenu.getText() : null));
 
         if (TextUtils.isNotNullOrBlank(boardName) && TextUtils.isNotNullOrBlank(platformName)) {
             String board = String.format("%s %s%s::%s", SourceExtractor.BOARDNAME_MARKER,
