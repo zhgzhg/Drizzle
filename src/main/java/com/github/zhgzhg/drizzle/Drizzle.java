@@ -553,7 +553,8 @@ public class Drizzle implements Tool {
             return -1;
         }
 
-        Map<String, String> requiredLibs = this.sourceExtractor.dependentLibsFromMainSketchSource(source);
+        Map<String, SourceExtractor.DependentLibrary> requiredLibs =
+                this.sourceExtractor.dependentLibsFromMainSketchSource(source);
         if (requiredLibs.isEmpty()) {
             return 0;
         }
@@ -567,9 +568,9 @@ public class Drizzle implements Tool {
         List<ContributedLibrary> librariesToInstall = new ArrayList<>();
         int installedLibrariesCount = 0;
 
-        for (Map.Entry<String, String> entry : requiredLibs.entrySet()) {
-            String libName = entry.getKey();
-            String libVer = entry.getValue();
+        for (SourceExtractor.DependentLibrary entry : requiredLibs.values()) {
+            String libName = entry.name;
+            String libVer = entry.version;
 
             List<ContributedLibrary> installCandidates =
                     availableLibraries.stream().filter(lib -> libName.equals(lib.getName())).collect(Collectors.toList());

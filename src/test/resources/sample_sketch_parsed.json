@@ -28,9 +28,26 @@
     }
   ],
   "libraries": {
-    "BMP280_DEV": "(>= 1.0.8 && < 1.0.16)",
-    "Arduino_CRC32": "1.0.0",
-    "Arduino Cloud Provider Examples": "*"
+    "BMP280_DEV": {
+      "version": "(>= 1.0.8 && < 1.0.16)",
+      "arduinoCliFmt": "BMP280_DEV@1.0.8"
+    },
+    "MyAwesomeLib": {
+      "version": "https://www.myawe.some/file.zip",
+      "arduinoCliFmt": "--zip-path https://www.myawe.some/file.zip"
+    },
+    "MyAwesomeLib2": {
+      "version": "https://www.myawe.some/file.git",
+      "arduinoCliFmt": "--git-url https://www.myawe.some/file.git"
+    },
+    "Arduino_CRC32": {
+      "version": "1.0.0",
+      "arduinoCliFmt": "Arduino_CRC32@1.0.0"
+    },
+    "Arduino Cloud Provider Examples": {
+      "version": "*",
+      "arduinoCliFmt": "Arduino Cloud Provider Examples"
+    }
   },
   "arduino_ide_tools": {
     "Drizzle": {

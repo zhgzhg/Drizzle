@@ -20,7 +20,7 @@ public class ProjectSettings {
     private SourceExtractor.Board board;
     @SerializedName("board_settings")
     private List<SourceExtractor.BoardSettings> boardSettings;
-    private Map<String, String> libraries;
+    private Map<String, SourceExtractor.DependentLibrary> libraries;
     @SerializedName("arduino_ide_tools")
     private Map<String, SourceExtractor.ArduinoTool> arduinoIdeTools;
 
@@ -48,11 +48,11 @@ public class ProjectSettings {
         this.boardSettings = boardSettings;
     }
 
-    public Map<String, String> getLibraries() {
+    public Map<String, SourceExtractor.DependentLibrary> getLibraries() {
         return libraries;
     }
 
-    public void setLibraries(final Map<String, String> libraries) {
+    public void setLibraries(final Map<String, SourceExtractor.DependentLibrary> libraries) {
         this.libraries = libraries;
     }
 
@@ -124,20 +124,26 @@ public class ProjectSettings {
     }
 
     public static String toJSON(ProjectSettings projectSettings) {
+
+        Type dependentLibraryContainerType = new TypeToken<Map<String, SourceExtractor.DependentLibrary>>() { }.getType();
         Type ardToolsContainerType = new TypeToken<Map<String, SourceExtractor.ArduinoTool>>() { }.getType();
 
         Gson gson = new GsonBuilder().disableHtmlEscaping().serializeNulls().setPrettyPrinting()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(dependentLibraryContainerType, new MapOfDependentLibrariesSerializerCustomizer())
                 .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
         return gson.toJson(projectSettings);
     }
 
     public static ProjectSettings fromJSON(String json, LogProxy logger) {
+
+        Type dependentLibraryContainerType = new TypeToken<Map<String, SourceExtractor.DependentLibrary>>() { }.getType();
         Type ardToolsContainerType = new TypeToken<Map<String, SourceExtractor.ArduinoTool>>() { }.getType();
 
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(dependentLibraryContainerType, new MapOfDependentLibrariesSerializerCustomizer())
                 .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
         try {
@@ -153,7 +159,7 @@ public class ProjectSettings {
         SourceExtractor.BoardManager boardManager = sourceExtractor.dependentBoardManagerFromMainSketchSource(source);
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
-        Map<String, String> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
+        Map<String, SourceExtractor.DependentLibrary> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
         List<SourceExtractor.ArduinoTool> arduinoTools = sourceExtractor.arduinoToolsFromMainSketchSource(source);
 
         Map<String, SourceExtractor.ArduinoTool> arduinoToolsMap = null;

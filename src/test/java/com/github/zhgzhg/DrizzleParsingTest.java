@@ -2,6 +2,7 @@ package com.github.zhgzhg;
 
 import com.github.zhgzhg.drizzle.utils.json.BoardSettingsSerializerCustomizer;
 import com.github.zhgzhg.drizzle.utils.json.MapOfArduinoToolsSerializerCustomizer;
+import com.github.zhgzhg.drizzle.utils.json.MapOfDependentLibrariesSerializerCustomizer;
 import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
@@ -70,7 +71,7 @@ class DrizzleParsingTest {
         SourceExtractor.BoardManager boardManager = sourceExtractor.dependentBoardManagerFromMainSketchSource(source);
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
-        Map<String, String> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
+        Map<String, SourceExtractor.DependentLibrary> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
         List<SourceExtractor.ArduinoTool> arduinoTools = sourceExtractor.arduinoToolsFromMainSketchSource(source);
         Map<String, SourceExtractor.ArduinoTool> arduinoToolMap = null;
         if (arduinoTools != null && !arduinoTools.isEmpty()) {
@@ -98,10 +99,12 @@ class DrizzleParsingTest {
         ProjectSettings projectSettings = createProjectSettings(sourceExtractor, source);
         ProjectSettings projectSettings2 = createProjectSettings(sourceExtractor, source2);
 
+        Type dependentLibraryContainerType = new TypeToken<Map<String, SourceExtractor.DependentLibrary>>() { }.getType();
         Type ardToolsContainerType = new TypeToken<Map<String, SourceExtractor.ArduinoTool>>() { }.getType();
 
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().serializeNulls()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(dependentLibraryContainerType, new MapOfDependentLibrariesSerializerCustomizer())
                 .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
 
@@ -111,9 +114,12 @@ class DrizzleParsingTest {
 
     @Test
     void jsonParserTest() throws IOException {
+
+        Type dependentLibraryContainerType = new TypeToken<Map<String, SourceExtractor.DependentLibrary>>() { }.getType();
         Type ardToolsContainerType = new TypeToken<Map<String, SourceExtractor.ArduinoTool>>() { }.getType();
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
+                .registerTypeAdapter(dependentLibraryContainerType, new MapOfDependentLibrariesSerializerCustomizer())
                 .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
 

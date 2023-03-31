@@ -1,5 +1,6 @@
 package com.github.zhgzhg.drizzle.utils.source;
 
+import com.github.gundy.semver4j.model.Version;
 import com.github.zhgzhg.drizzle.parser.CPP14Lexer;
 import com.github.zhgzhg.drizzle.parser.CPP14Parser;
 import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
@@ -16,6 +17,7 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.AbstractMap;
@@ -145,6 +147,41 @@ public class SourceExtractor {
         public String toString() {
             return "BoardSettings{" + "board=" + board.toString().replaceFirst("providerPackage='[^']*', ", "")
                     + ", clickableOptions=" + clickableOptions + '}';
+        }
+    }
+
+    public static class DependentLibrary {
+        public final String name;
+        public final String version;
+        public final String arduinoCliFmt;
+
+        public DependentLibrary(String name, String version) {
+            this.name = name;
+            this.version = version;
+
+            URL url = TextUtils.toURL(version, null);
+            if (url == null) {
+                if (TextUtils.isNullOrBlank(version) || "*".equals(TextUtils.trim(version," ()"))) {
+                    this.arduinoCliFmt = name;
+                } else {
+                    Version parsedVer = Version.fromString(version);
+                    this.arduinoCliFmt = name + "@" + parsedVer.getMajor() + "." + parsedVer.getMinor() + "." + parsedVer.getPatch()
+                            + (parsedVer.getBuildIdentifiers().isEmpty() ? "" : parsedVer.getBuildIdentifiers().stream()
+                            .map(Version.Identifier::toString).collect(Collectors.joining(".", "+", "")));
+                }
+            } else if (url.toString().toLowerCase().endsWith(".zip")) {
+                this.arduinoCliFmt = "--zip-path " + url.toString();
+            } else if (url.toString().toLowerCase().endsWith(".git")){
+                this.arduinoCliFmt = "--git-url " + url.toString();
+            } else {
+                this.arduinoCliFmt = name;
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "DependentLibrary{name='" + name + "', version='" + version
+                    + "', arduinoCliFmt='" + arduinoCliFmt + "'}";
         }
     }
 
@@ -340,16 +377,19 @@ public class SourceExtractor {
         return null;
     }
 
-    public Map<String, String> dependentLibsFromMainSketchSource(String source) {
+    public Map<String, DependentLibrary> dependentLibsFromMainSketchSource(String source) {
         ProjectSettings projectSettings = this.loadAllFromDrizzleJson();
         if (projectSettings != null) {
-            Map<String, String> libraries = projectSettings.getLibraries();
+            Map<String, DependentLibrary> libraries = projectSettings.getLibraries();
             return (libraries != null ? libraries : Collections.emptyMap());
         }
 
         try {
-            return extractMarkersKeyValue(
-                    extractAllCommentsFromSource(source), DEPENDS_ON_LIB_VERSION, DEPENDSON_MARKER, LIB_GROUP, VER_GROUP);
+            return extractMarkersKeyValue(extractAllCommentsFromSource(source), DEPENDS_ON_LIB_VERSION,
+                    DEPENDSON_MARKER, LIB_GROUP, VER_GROUP)
+                    .entrySet().stream()
+                    .map(entry -> new DependentLibrary(entry.getKey(), entry.getValue()))
+                    .collect(Collectors.toMap(de -> de.name, Function.identity(), (de1, de2) -> de1, LinkedHashMap::new));
         } catch (IOException e) {
             e.printStackTrace(this.logProxy.stderr());
         }
