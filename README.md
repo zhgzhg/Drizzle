@@ -50,7 +50,7 @@ An example:
  * @DependsOn Arduino Cloud Provider Examples::*
  * @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
  *
- * @ArduinoTool Drizzle::(<0.14.3)::https://github.com/zhgzhg/Drizzle/releases/download/0.14.3/drizzle-0.14.3-dist.zip
+ * @ArduinoTool Drizzle::(<0.15.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.15.0/drizzle-0.15.0-dist.zip
  */
 
 // Your sample code follows below just as usual
