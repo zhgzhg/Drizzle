@@ -110,7 +110,7 @@ public class ProjectSettings {
 
         if (this.getLibraries() != null) {
             this.getLibraries().forEach((k, v) ->
-                    sb.append(String.format("%s %s::%s%n", SourceExtractor.DEPENDSON_MARKER, k, v))
+                    sb.append(String.format("%s %s::%s%n", SourceExtractor.DEPENDSON_MARKER, k, v.version))
             );
         }
 
