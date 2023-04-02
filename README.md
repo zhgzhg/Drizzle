@@ -111,14 +111,15 @@ Supported Markers
     * `@BoardManager Raspberry Pi Pico/RP2040::~1.6::https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json`
 
 
-* __@Board__ [_provider_package_name_::]_platform_name_::_board_name_
-  * Selects the name of the target board
+* __@Board__ [_provider_package_name_::]_platform_name_::_board_id_ | _board_name_
+  * Selects the id/name of the target board. **The ID matching is with priority!**
   * __Respects the first valid marker that's found. The rest will be ignored.__
   * __Not specifying provider package name would make Drizzle to attempt resolving it automatically.__
   * Examples:
     * `@Board arduino::Arduino AVR Boards::Arduino Nano`
     * `@Board esp8266::NodeMCU 1.0 (ESP-12E Module)`
-    * `@Board esp32::ESP32 Dev Module`
+    * `@Board esp32::ESP32 Wrover Module`
+    * `@Board esp32::esp32::esp32wrover`
     * `@Board rp2040::Raspberry Pi Pico/RP2040::Raspberry Pi Pico`
 
 
@@ -130,7 +131,8 @@ Supported Markers
     * Full list of the supported expressions at: https://github.com/npm/node-semver#ranges
     * In case _library_uri_ is specified instead of _library_version_:
       * _library_name_ must be unique, but is not required to precisely match the actual library name
-      * HTTP or HTTPS protocol is supported for .ZIP files directly specified in the URI
+      * HTTP or HTTPS protocol is supported for .ZIP files directly specified in the URI, or GIT repositories
+      * HTTP(S) URLs for git can end with `#tag_or_commit_or_branch_name` reference - see the examples below
       * file:/// prefix can be used to point to local directory containing the library, or to a concrete .ZIP file
   * To achieve better control any transitive dependencies won't be automatically installed, but will be listed in the logs.
   * Examples:
@@ -141,10 +143,13 @@ Supported Markers
     * `@DependsOn Local BMP280_DEV::file:///C:/Users/John/Desktop/BMP280_DEV-1.0.15.zip`
     * `@DependsOn Local BMP280_DEV::file:///C:/Users/John/Desktop/BMP280_DEV_DIRECTORY`
     * `@DependsOn Github's BMP280_DEV::https://github.com/MartinL1/BMP280_DEV/archive/master.zip`
+    * `@DependsOn Github's BMP280_DEV::https://github.com/MartinL1/BMP280_DEV.git`
+    * `@DependsOn Github's BMP280_DEV::https://github.com/MartinL1/BMP280_DEV.git#V1.0.21`
 
 
-* __@BoardSettings__ _platform_name_::_board_name_::_menu_path_[->_option_][||_another_menu_path_->option]
+* __@BoardSettings__ _platform_name_::_board_id_ | _board_name_::_menu_path_[->_option_][||_another_menu_path_->option]
   * Clicks on the UI options provided by a particular board (and platform)
+  * Board ID or name can be used. **Board ID matching is attempted first.**
   * __More__ than 1 marker can be used.
   * To match all platforms and/or board names a * can be used
   * To describe the path to the particular option -> can be used
@@ -153,7 +158,8 @@ Supported Markers
   * Menu matching will be performed in the order of definition and __will stop immediately once a match is found__. Always define the
     concrete rules in the beginning, and the less concrete at the end.  
   * Examples:
-    * `@BoardSettings esp32::ESP32 Dev Module::Flash Frequency->40MHz`
+    * `@BoardSettings esp32::esp32wrover::Flash Frequency->40MHz`
+    * `@BoardSettings esp32::ESP32 Wrover Module::Flash Frequency->40MHz`
     * `@BoardSettings esp32::*::Flash Frequency->40MHz||PSRAM->Disabled`
     * `@BoardSettings *::*::Upload Speed->115200`
 
@@ -170,9 +176,9 @@ Supported Markers
   * The _tool_name_ must match the name of the directory containing the actual tool. It has to be unique. In the case of several duplicating
     names the first one will be respected.
   * Examples:
-    * `@ArduinoTool Drizzle::(<0.14.3)::https://github.com/zhgzhg/Drizzle/releases/download/0.14.3/drizzle-0.14.3-dist.zip`
+    * `@ArduinoTool Drizzle::(<0.15.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.15.0/drizzle-0.15.0-dist.zip`
     * `@ArduinoTool Drizzle::*::file:///C:/Users/John/Drizzle/drizzle.zip`
-    * `@ArduinoTool EspExceptionDecoder::(<=1.0.0)::https://github.com/me-no-dev/EspExceptionDecoder/releases/download/1.1.0/EspExceptionDecoder-1.1.0.zip`
+    * `@ArduinoTool EspExceptionDecoder::(<=1.0.0)::https://github.com/me-no-dev/EspExceptionDecoder/releases/download/2.0.2/EspExceptionDecoder-2.0.2.zip`
 
 
 CLI Extras
@@ -181,7 +187,7 @@ CLI Extras
 Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
 from JSON file Drizzle markers will be produced is also supported.
 
-For e.g. `java -jar drizzle-0.14.3.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.15.0.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -214,20 +220,29 @@ For e.g. `java -jar drizzle-0.14.3.jar --parse hello-world.ino` will produce:
     }
   ],
   "libraries": {
-    "BMP280_DEV": "(>= 1.0.8 && < 1.0.16)",
-    "Arduino_CRC32": "1.0.0",
-    "Arduino Cloud Provider Examples": "*"
+    "BMP280_DEV": {
+      "version": "(>= 1.0.8 && < 1.0.16)",
+      "arduinoCliFmt": "BMP280_DEV@1.0.8"
+    },
+    "Arduino_CRC32": {
+      "version": "1.0.0",
+      "arduinoCliFmt": "Arduino_CRC32@1.0.0"
+    },
+    "Arduino Cloud Provider Examples": {
+      "version": "*",
+      "arduinoCliFmt": "Arduino Cloud Provider Examples"
+    }
   },
   "arduino_ide_tools": {
     "Drizzle": {
-      "version": "(<0.14.3)",
-      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.14.3/drizzle-0.14.3-dist.zip"
+      "version": "(<0.15.0)",
+      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.15.0/drizzle-0.15.0-dist.zip"
     }
   }
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.14.3.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.15.0.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
@@ -236,7 +251,7 @@ Executing on the above JSON `java -jar drizzle-0.14.3.jar --rev-parse hello-worl
 @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
-@ArduinoTool Drizzle::(<0.14.3)::https://github.com/zhgzhg/Drizzle/releases/download/0.14.3/drizzle-0.14.3-dist.zip
+@ArduinoTool Drizzle::(<0.15.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.15.0/drizzle-0.15.0-dist.zip
 ```
 
 

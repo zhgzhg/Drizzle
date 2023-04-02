@@ -12,7 +12,7 @@
  * @DependsOn Arduino Cloud Provider Examples::*
  * @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
  * @DependsOn MyAwesomeLib::https://www.myawe.some/file.zip
- * @DependsOn MyAwesomeLib2::https://www.myawe.some/file.git
+ * @DependsOn MyAwesomeLib2::https://www.myawe.some/file.git#myrevision
  *
  * @ArduinoTool Drizzle::(<=0.2)::file:///somewhere.zip
  * @ArduinoTool Drizzl3::(<=0.3)::file:///somewhere.zip

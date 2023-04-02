@@ -37,8 +37,8 @@
       "arduinoCliFmt": "--zip-path https://www.myawe.some/file.zip"
     },
     "MyAwesomeLib2": {
-      "version": "https://www.myawe.some/file.git",
-      "arduinoCliFmt": "--git-url https://www.myawe.some/file.git"
+      "version": "https://www.myawe.some/file.git#myrevision",
+      "arduinoCliFmt": "--git-url https://www.myawe.some/file.git#myrevision"
     },
     "Arduino_CRC32": {
       "version": "1.0.0",

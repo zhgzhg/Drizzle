@@ -171,7 +171,7 @@ public class SourceExtractor {
                 }
             } else if (url.toString().toLowerCase().endsWith(".zip")) {
                 this.arduinoCliFmt = "--zip-path " + url.toString();
-            } else if (url.toString().toLowerCase().endsWith(".git")){
+            } else if (url.getPath().toLowerCase().endsWith(".git")){
                 this.arduinoCliFmt = "--git-url " + url.toString();
             } else {
                 this.arduinoCliFmt = name;

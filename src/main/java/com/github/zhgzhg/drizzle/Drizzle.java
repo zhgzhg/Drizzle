@@ -553,8 +553,7 @@ public class Drizzle implements Tool {
             return -1;
         }
 
-        Map<String, SourceExtractor.DependentLibrary> requiredLibs =
-                this.sourceExtractor.dependentLibsFromMainSketchSource(source);
+        Map<String, SourceExtractor.DependentLibrary> requiredLibs = this.sourceExtractor.dependentLibsFromMainSketchSource(source);
         if (requiredLibs.isEmpty()) {
             return 0;
         }
@@ -723,26 +722,40 @@ public class Drizzle implements Tool {
         }
 
         if (uri.getScheme().toLowerCase().startsWith("http")) {
-            if (!uri.getPath().toLowerCase().endsWith(".zip")) {
-                this.logProxy.cliError("The external URL library must be a concrete ZIP file - '%s'! Skipping it!%n", libUri);
+
+            boolean isZip = uri.getPath().toLowerCase().endsWith(".zip");
+            if (!isZip && !uri.getPath().toLowerCase().endsWith(".git")) {
+                this.logProxy.cliError("The external URL library must be a concrete ZIP file or GIT repository - '%s'! Skipping it!%n", libUri);
                 return true;
             }
 
-            this.logProxy.cliInfo("ZIP URI detected! Picked %s%n", libUri);
+            this.logProxy.cliInfo("%s URI detected! Picked %s%n", (isZip ? "ZIP file" : "GIT repo"), libUri);
 
             FileUtils fileUtils = new FileUtils(logProxy);
-            File tempFile = fileUtils.downloadZip(url, "-lib");
 
-            if (tempFile != null) {
-                ExternLibFileInstaller<EditorConsole> installer = new ExternLibFileInstaller<EditorConsole>(this.logProxy);
-                if (installer.installZipOrDirWithZips(tempFile)) {
-                    installer.logSuccessfullyInstalledLib(libUri);
-                    BaseNoGui.librariesIndexer.rescanLibraries();
-                    logURILibNotInstalledOrUnlistedTransitiveDependencies(libName, installer, allRequiredLibNames);
+            if (!isZip) {
+                FileUtils.RepoLibDir repoLibDir = fileUtils.downloadGit(url, libName, "-libgit");
+                if (repoLibDir != null && repoLibDir.dir != null) {
+                    ExternLibFileInstaller<EditorConsole> installer = new ExternLibFileInstaller<EditorConsole>(this.logProxy);
+                    if (installer.installZipOrDirWithZips(repoLibDir.dir)) {
+                        installer.logSuccessfullyInstalledLib(libUri);
+                        BaseNoGui.librariesIndexer.rescanLibraries();
+                        logURILibNotInstalledOrUnlistedTransitiveDependencies(repoLibDir.resultingLibNameDir, installer, allRequiredLibNames);
+                    }
+                    fileUtils.delayedDirRemoval(30000, repoLibDir.dir.getParentFile());
+                }
+            } else {
+                File tempFile = fileUtils.downloadZip(url, "-lib");
+                if (tempFile != null) {
+                    ExternLibFileInstaller<EditorConsole> installer = new ExternLibFileInstaller<EditorConsole>(this.logProxy);
+                    if (installer.installZipOrDirWithZips(tempFile)) {
+                        installer.logSuccessfullyInstalledLib(libUri);
+                        BaseNoGui.librariesIndexer.rescanLibraries();
+                        logURILibNotInstalledOrUnlistedTransitiveDependencies(libName, installer, allRequiredLibNames);
+                    }
+                    fileUtils.delayedFileRemoval(30000, tempFile);
                 }
             }
-
-            fileUtils.delayedFileRemoval(30000, tempFile);
 
             return true;
         }
@@ -776,7 +789,7 @@ public class Drizzle implements Tool {
 
         Set<String> notInstalledTransitiveDependencies = installer.getTransitiveDependencies().stream()
                 .map(BaseNoGui.librariesIndexer.getIndex()::find)
-                .filter(contributedLibraries -> contributedLibraries.stream()
+                .filter(contributedLibraries -> !contributedLibraries.isEmpty() && contributedLibraries.stream()
                         .allMatch(cl -> !cl.isLibraryInstalled() && !cl.getArchitectures().isEmpty() && !cl.getArchitectures().contains("*")
                                 && !cl.getArchitectures().contains(currBoardArch))
                 )
