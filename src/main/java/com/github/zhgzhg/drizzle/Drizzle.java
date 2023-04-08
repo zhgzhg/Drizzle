@@ -67,12 +67,13 @@ import java.util.stream.Stream;
 
 public class Drizzle implements Tool {
 
-    public static final String MENUS_HOLDER = "Drizzle";
-    public static final String MENU_APPLY_MARKERS = "Apply Markers";
+    public static final String MENUS_HOLDER_TITLE = "Drizzle";
+    public static final String MENU_APPLY_MARKERS_TITLE = "Apply Markers";
     public static final String MENU_AUTOGEN_ALL_MARKERS_TITLE = "Auto-generate @Board* and @Dependency Markers (via compilation)";
     public static final String MENU_AUTOGEN_BOARD_MARKERS_TITLE = "Auto-generate @Board* Markers";
+    public static final String MENU_SHOW_AVAILABLE_FBNS_TITLE = "List Available FQBNs";
     public static final String MENU_ARDUINO_TOOL_INSTALL_TITLE = "Install tools marked with @ArduinoTool";
-    public static final String MENU_ABOUT_DRIZZLE = "About Drizzle";
+    public static final String MENU_ABOUT_DRIZZLE_TITLE = "About Drizzle";
 
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
@@ -85,11 +86,12 @@ public class Drizzle implements Tool {
     private LogProxy<EditorConsole> logProxy;
     private UILocator uiLocator;
 
-    private JMenuItem applyDrizzleMarkersMenu = new JMenuItem(MENU_APPLY_MARKERS);
+    private JMenuItem applyDrizzleMarkersMenu = new JMenuItem(MENU_APPLY_MARKERS_TITLE);
     private JMenuItem boardSettingsAndDependenciesGeneratorMenu = new JMenuItem(MENU_AUTOGEN_ALL_MARKERS_TITLE);
     private JMenuItem boardAndSettingsGeneratorMenu = new JMenuItem(MENU_AUTOGEN_BOARD_MARKERS_TITLE);
+    private JMenuItem availableBoardFqdnListMenu = new JMenuItem(MENU_SHOW_AVAILABLE_FBNS_TITLE);
     private JMenuItem arduinoToolInstallMenu = new JMenuItem(MENU_ARDUINO_TOOL_INSTALL_TITLE);
-    private JMenuItem aboutDrizzleMenu = new JMenuItem(MENU_ABOUT_DRIZZLE);
+    private JMenuItem aboutDrizzleMenu = new JMenuItem(MENU_ABOUT_DRIZZLE_TITLE);
 
     @Override
     public void init(final Editor editor) {
@@ -156,6 +158,24 @@ public class Drizzle implements Tool {
                 }
             }
         });
+        this.availableBoardFqdnListMenu.addActionListener(new AbstractAction() {
+            @Override
+            public void actionPerformed(final ActionEvent e) {
+                logProxy.cliInfoln("PackageID:PlatformID:BoardID");
+                logProxy.cliInfoln("----------------------------\n");
+
+                BaseNoGui.packages.values().stream()
+                        .flatMap(targetPackage -> targetPackage.platforms().stream())
+                        .flatMap(targetPlatform -> targetPlatform.getBoards().values().stream())
+                        .map(targetBoard -> targetBoard.getFQBN())
+                        .distinct()
+                        .sorted()
+                        .map(fqbn -> fqbn.replace(":", "::"))
+                        .forEach(logProxy::cliInfoln);
+
+                logProxy.cliInfoln("\nTo use in Drizzle use double colons (::) as a separator.");
+            }
+        });
         this.arduinoToolInstallMenu.addActionListener(new AbstractAction() {
             @Override
             public void actionPerformed(final ActionEvent e) {
@@ -203,7 +223,7 @@ public class Drizzle implements Tool {
 
         this.aboutDrizzleMenu.addActionListener(e -> {
             JOptionPane.showMessageDialog(null, String.format("Drizzle %s - a dependency helper tool for Arduino IDE%n%n%s%n",
-                    DrizzleCLI.version(), UpdateUtils.webUrl()), MENU_ABOUT_DRIZZLE, JOptionPane.PLAIN_MESSAGE, null);
+                    DrizzleCLI.version(), UpdateUtils.webUrl()), MENU_ABOUT_DRIZZLE_TITLE, JOptionPane.PLAIN_MESSAGE, null);
         });
 
         this.editor.addComponentListener(new ComponentAdapter() {
@@ -222,10 +242,11 @@ public class Drizzle implements Tool {
                         .ifPresent(m -> {
                             int index = m.getComponentIndex(drizzleMenu.get());
 
-                            JMenu drizzleMenus = new JMenu(MENUS_HOLDER);
+                            JMenu drizzleMenus = new JMenu(MENUS_HOLDER_TITLE);
                             drizzleMenus.add(applyDrizzleMarkersMenu);
                             drizzleMenus.add(boardAndSettingsGeneratorMenu);
                             drizzleMenus.add(boardSettingsAndDependenciesGeneratorMenu);
+                            drizzleMenus.add(availableBoardFqdnListMenu);
                             drizzleMenus.add(arduinoToolInstallMenu);
                             drizzleMenus.add(aboutDrizzleMenu);
 
@@ -253,7 +274,7 @@ public class Drizzle implements Tool {
                                 ArduinoIDEToolsInstaller drizzleInstaller = new ArduinoIDEToolsInstaller(logProxy);
                                 logProxy.cliInfo("Downloading & installing the latest version of Drizzle (please wait)... ");
 
-                                boolean isSuccess = drizzleInstaller.installTool(MENUS_HOLDER, UpdateUtils.latestVersionOfDistZIP());
+                                boolean isSuccess = drizzleInstaller.installTool(MENUS_HOLDER_TITLE, UpdateUtils.latestVersionOfDistZIP());
                                 if (isSuccess) {
                                     drizzleInstaller.selfDestroyJarOnExit();
                                     logProxy.cliWarn("succeeded!%nThe Arduino IDE will be closed in 10 seconds...%n");
@@ -272,7 +293,7 @@ public class Drizzle implements Tool {
 
     @Override
     public String getMenuTitle() {
-        return MENUS_HOLDER;
+        return MENUS_HOLDER_TITLE;
     }
 
     @Override
@@ -674,12 +695,12 @@ public class Drizzle implements Tool {
 
         if (!missingNotInstalledTransitiveDependencies.isEmpty()) {
             this.logProxy.cliError(
-                    "Check your %s dependency list! The following transitive dependencies are not installed:%n", MENUS_HOLDER);
+                    "Check your %s dependency list! The following transitive dependencies are not installed:%n", MENUS_HOLDER_TITLE);
             missingNotInstalledTransitiveDependencies.forEach(transDep -> this.logProxy.cliError(
                     " - %s, possibly version %s, introduced by: %s%n", transDep.getName(), transDep.getParsedVersion(),
                     this.introducingTransitiveDependencyLibsToString(transitiveDependencyRequiredBy, transDep))
             );
-            this.logProxy.uiWarn("Please add the missing transitive dependencies to your %s list.", MENUS_HOLDER);
+            this.logProxy.uiWarn("Please add the missing transitive dependencies to your %s list.", MENUS_HOLDER_TITLE);
         }
         if (!missingTransitiveDependencies.isEmpty()) {
             this.logProxy.cliError("The following transitive dependencies are not listed in your project:%n");
@@ -687,7 +708,7 @@ public class Drizzle implements Tool {
                     transDep.getName(), transDep.getParsedVersion(),
                     this.introducingTransitiveDependencyLibsToString(transitiveDependencyRequiredBy, transDep))
             );
-            this.logProxy.uiWarn("Please add the missing transitive dependencies to your %s list.", MENUS_HOLDER);
+            this.logProxy.uiWarn("Please add the missing transitive dependencies to your %s list.", MENUS_HOLDER_TITLE);
         }
 
         return librariesToInstall.size() + installedLibrariesCount - missingNotInstalledTransitiveDependencies.size();
@@ -809,7 +830,7 @@ public class Drizzle implements Tool {
                 .collect(Collectors.toSet());
         if (!unlistedTransitiveDependencies.isEmpty()) {
             this.logProxy.cliError(
-                    "%s depends transitively on the following unlisted in your %s settings libraries:%n", libName, MENUS_HOLDER);
+                    "%s depends transitively on the following unlisted in your %s settings libraries:%n", libName, MENUS_HOLDER_TITLE);
             unlistedTransitiveDependencies.forEach(td -> this.logProxy.cliErrorln(" - " + td));
             this.logProxy.uiWarn("Please add the missing transitive dependencies to your Drizzle list.");
         }
@@ -887,7 +908,7 @@ public class Drizzle implements Tool {
         return String.format("/**\n * Automatically generated by Drizzle %s dependency helper tool, based on the selected"
                 + "\n * at %s board options in Arduino IDE's UI. To apply them make sure this file is saved, then click on"
                 + "\n * Tools -> %s -> %s. To obtain Drizzle visit: %s"
-                + "\n *", DrizzleCLI.version(), Instant.now().toString(), MENUS_HOLDER, MENU_APPLY_MARKERS, UpdateUtils.webUrl());
+                + "\n *", DrizzleCLI.version(), Instant.now().toString(), MENUS_HOLDER_TITLE, MENU_APPLY_MARKERS_TITLE, UpdateUtils.webUrl());
     }
 
     private List<String> autogenDependencyMarkers(final ActionEvent e, MutableBoolean hadCompilationIssuesFlag) {
