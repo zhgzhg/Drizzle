@@ -59,7 +59,7 @@ public class UILocator {
         return Stream.of(editor.getContentPane().getParent().getComponents())
                 .filter(c -> c instanceof JMenuBar)
                 .flatMap(jb -> Stream.of(((JMenuBar) jb).getMenu(3).getMenuComponents()))
-                .filter(c -> c instanceof JMenuItem && Drizzle.MENUS_HOLDER.equals(((JMenuItem)c).getText()))
+                .filter(c -> c instanceof JMenuItem && Drizzle.MENUS_HOLDER_TITLE.equals(((JMenuItem)c).getText()))
                 .map(c -> (JMenuItem) c)
                 .findFirst();
     }

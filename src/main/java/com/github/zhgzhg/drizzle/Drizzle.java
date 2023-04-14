@@ -13,6 +13,7 @@ import com.github.gundy.semver4j.model.Version;
 import com.github.zhgzhg.drizzle.utils.arduino.ArduinoIDEToolsInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
+import com.github.zhgzhg.drizzle.utils.arduino.IDECompilationHook;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
 import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
 import com.github.zhgzhg.drizzle.utils.collection.CollectionUtils;
@@ -50,8 +51,8 @@ import java.time.Instant;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -77,6 +78,7 @@ public class Drizzle implements Tool {
 
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
+    private IDECompilationHook normalCompilationHook;
     private ContributionInstaller contributionInstaller;
     private LibraryInstaller libraryInstaller;
     private SourceExtractor sourceExtractor;
@@ -117,6 +119,61 @@ public class Drizzle implements Tool {
 
         this.contributionInstaller = new ContributionInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
         this.libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
+
+        this.normalCompilationHook = new IDECompilationHook(editor, logProxy,
+                (_editor, _logProxy, _context, _origRun) -> {
+                    String msg = "Compiling with the help of Drizzle...";
+                    logProxy.uiInfo(msg);
+                    logProxy.cliInfoln(msg);
+                    String source;
+                    try {
+                        source = SourceExtractor.loadSourceFromPrimarySketch(editor);
+                    } catch (IOException ex) {
+                        logProxy.cliErrorln(ex);
+                        logProxy.uiError(SourceExtractor.PREFERENCES_MARKER + ": error " + ex.getMessage());
+                        return false;
+                    }
+
+                    TargetPlatform targetPlatform = BaseNoGui.getTargetPlatform();
+                    String targetPackageName = null;
+                    String targetPlatformName = null;
+                    if (targetPlatform != null) {
+                        TargetPackage containerPackage = targetPlatform.getContainerPackage();
+                        if (containerPackage != null) {
+                            targetPackageName = containerPackage.getId();
+                        }
+                        targetPlatformName = targetPlatform.getId();
+                    }
+
+                    TargetBoard targetBoard = BaseNoGui.getTargetBoard();
+                    String targetBoardName = null;
+                    String targetBoardId = null;
+                    if (targetBoard != null) {
+                        targetBoardName = targetBoard.getName();
+                        targetBoardId = targetBoard.getId();
+                    }
+
+                    SourceExtractor se = new SourceExtractor(_editor, _logProxy);
+                    for (SourceExtractor.Preferences pref : se.dependentPreferencesFromMainSketchSource(source)) {
+                        if (pref.suitsRequirements("", targetPlatformName, targetBoardId)
+                                || pref.suitsRequirements("", targetPlatformName, targetBoardName)) {
+
+                            pref.preferences.entrySet().stream()
+                                    .forEach(ent -> {
+                                        String k = String.format("runtime.build_properties_custom.%s", ent.getKey());
+                                        String v = ent.getValue();
+                                        PreferencesData.set(k, v);
+                                        _context.put(k, v);
+                                    });
+                        }
+                    }
+
+                    return true;
+                },
+                (_editor, _logProxy, _context, _origRun) -> {
+                    _context.keySet().stream().forEach(PreferencesData::remove);
+                    return true;
+                });
 
         this.applyDrizzleMarkersMenu.addActionListener(new AbstractAction() {
             @Override
@@ -161,6 +218,7 @@ public class Drizzle implements Tool {
         this.availableBoardFqdnListMenu.addActionListener(new AbstractAction() {
             @Override
             public void actionPerformed(final ActionEvent e) {
+                logProxy.cliInfoln("----------------------------");
                 logProxy.cliInfoln("PackageID:PlatformID:BoardID");
                 logProxy.cliInfoln("----------------------------\n");
 
@@ -170,7 +228,6 @@ public class Drizzle implements Tool {
                         .map(targetBoard -> targetBoard.getFQBN())
                         .distinct()
                         .sorted()
-                        .map(fqbn -> fqbn.replace(":", "::"))
                         .forEach(logProxy::cliInfoln);
 
                 logProxy.cliInfoln("\nTo use in Drizzle use double colons (::) as a separator.");
@@ -264,6 +321,8 @@ public class Drizzle implements Tool {
                                 JOptionPane.WARNING_MESSAGE, null);
                         return;
                     }
+
+                    normalCompilationHook.hookOnSketchController();
 
                     if (!UpdateUtils.isTheLatestVersion(logProxy)) {
                         final NotificationPopup[] notificationHolder = new NotificationPopup[1];
@@ -631,7 +690,7 @@ public class Drizzle implements Tool {
 
         Set<ContributedLibrary> missingTransitiveDependencies = new LinkedHashSet<>();
         Set<ContributedLibrary> missingNotInstalledTransitiveDependencies = new LinkedHashSet<>();
-        Map<ContributedLibrary, Set<ContributedLibrary>> transitiveDependencyRequiredBy = new HashMap<>();
+        Map<ContributedLibrary, Set<ContributedLibrary>> transitiveDependencyRequiredBy = new LinkedHashMap<>();
 
         try {
             this.progressPrinter.begin(1, 5, 80, ".");
@@ -912,7 +971,7 @@ public class Drizzle implements Tool {
     }
 
     private List<String> autogenDependencyMarkers(final ActionEvent e, MutableBoolean hadCompilationIssuesFlag) {
-        final Map<String, String> libs = new HashMap<>();
+        final Map<String, String> libs = new LinkedHashMap<>();
         Pattern libsPattern = Pattern.compile(".*-> candidates: \\[([^\\]]+)\\].*");
 
         Optional<EditorStatus> editorStatus = uiLocator.editorStatus();
@@ -948,7 +1007,7 @@ public class Drizzle implements Tool {
                                 libs.put(TextUtils.trim(nameAndVersion[0], " "), ver);
                             });
                 }
-            }, progressVisualizer).compile();
+            }, progressVisualizer, this.normalCompilationHook.getBeforeHook(), this.normalCompilationHook.getAfterHook()).compile();
         } catch (RunnerException runnerException) {
             hadCompilationIssuesFlag.set(true);
             logProxy.cliErrorln(runnerException);

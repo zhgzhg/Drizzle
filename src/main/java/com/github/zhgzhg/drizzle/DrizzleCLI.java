@@ -21,7 +21,7 @@ public class DrizzleCLI {
 
             System.out.println("\tParses Arduino IDE sketches (.ino) files for comments containing");
             System.out.println("\tDrizzle's markers and outputs the information as JSON or applies");
-            System.out.println("\tthe reverse operation to JSON files.\n");
+            System.out.printf("\tthe reverse operation to JSON files.%n%n");
 
             System.out.printf("Usage:%n");
             System.out.printf("\tjava -jar drizzle-%s.jar --parse <arduino-proj.ino | arduino-proj-directory>%n", implementationVersion);

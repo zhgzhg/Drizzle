@@ -41,6 +41,7 @@
       "arduinoCliFmt": "Arduino Cloud Provider Examples"
     }
   },
+  "preferences": [],
   "arduino_ide_tools": {
     "Drizzl3": {
       "version": "(<=0.3)",

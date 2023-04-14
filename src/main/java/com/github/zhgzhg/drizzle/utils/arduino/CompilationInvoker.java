@@ -17,6 +17,7 @@ import java.io.OutputStream;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
@@ -25,13 +26,19 @@ public class CompilationInvoker {
     private final LogProxy<EditorConsole> logProxy;
     private final Consumer<String> compilerMessagesConsumer;
     private final Consumer<Integer> compilationProgressConsumer;
+    private final IDECompilationHook.HookExecutable beforeCompileHook;
+    private final IDECompilationHook.HookExecutable afterCompileHook;
 
     public CompilationInvoker(Editor editor, LogProxy<EditorConsole> logProxy, Consumer<String> compilerMessagesConsumer,
-            Consumer<Integer> compilationProgressConsumer) {
+            Consumer<Integer> compilationProgressConsumer, IDECompilationHook.HookExecutable beforeCompileHook,
+            IDECompilationHook.HookExecutable afterCompileHook) {
+
         this.editor = editor;
         this.logProxy = logProxy;
         this.compilerMessagesConsumer = compilerMessagesConsumer;
         this.compilationProgressConsumer = compilationProgressConsumer;
+        this.beforeCompileHook = beforeCompileHook;
+        this.afterCompileHook = afterCompileHook;
     }
 
     private void initCompilerVariables(Compiler compiler) throws RunnerException {
@@ -95,9 +102,19 @@ public class CompilationInvoker {
         MessageConsumerOutputStream err = new MessageConsumerOutputStream(new I18NAwareMessageConsumer(System.err), "\n");
 
         try {
-            String dummyVidPid = "";
-            callArduinoBuilder.invoke(compiler, targetBoard, targetBoard.getContainerPlatform(),
-                    targetBoard.getContainerPlatform().getContainerPackage(), dummyVidPid, compileAction, out, err);
+            Map<String, Object> ctx = new ConcurrentHashMap<>();
+            if (this.beforeCompileHook == null || this.beforeCompileHook.run(this.editor, this.logProxy, ctx,null)) {
+                try {
+                    String dummyVidPid = "";
+                    callArduinoBuilder.invoke(compiler, targetBoard, targetBoard.getContainerPlatform(),
+                            targetBoard.getContainerPlatform().getContainerPackage(), dummyVidPid, compileAction, out, err);
+                } finally {
+                    if (this.afterCompileHook != null) {
+                        this.afterCompileHook.run(this.editor, this.logProxy, ctx, null);
+                    }
+                    ctx.clear();
+                }
+            }
         } catch (Exception e) {
             throw new RunnerException(e);
         }

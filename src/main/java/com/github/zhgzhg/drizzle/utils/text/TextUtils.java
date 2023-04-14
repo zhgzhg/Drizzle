@@ -33,6 +33,10 @@ public class TextUtils {
         return false;
     }
 
+    public static boolean allNullOrBlank(String param, String... otherParams) {
+        return !anyNotBlank(param, otherParams);
+    }
+
     public static boolean isNotNullOrBlank(String param) {
         return !isNullOrBlank(param);
     }

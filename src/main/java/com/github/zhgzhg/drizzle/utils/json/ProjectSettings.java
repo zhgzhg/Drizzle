@@ -21,6 +21,8 @@ public class ProjectSettings {
     @SerializedName("board_settings")
     private List<SourceExtractor.BoardSettings> boardSettings;
     private Map<String, SourceExtractor.DependentLibrary> libraries;
+    @SerializedName("preferences")
+    private List<SourceExtractor.Preferences> preferences;
     @SerializedName("arduino_ide_tools")
     private Map<String, SourceExtractor.ArduinoTool> arduinoIdeTools;
 
@@ -56,6 +58,14 @@ public class ProjectSettings {
         this.libraries = libraries;
     }
 
+    public List<SourceExtractor.Preferences> getPreferences() {
+        return preferences;
+    }
+
+    public void setPreferences(final List<SourceExtractor.Preferences> preferences) {
+        this.preferences = preferences;
+    }
+
     public Map<String, SourceExtractor.ArduinoTool> getArduinoIdeTools() {
         return arduinoIdeTools;
     }
@@ -65,7 +75,8 @@ public class ProjectSettings {
     }
 
     public boolean containsData() {
-        return boardManager != null || board != null || boardSettings != null || libraries != null || arduinoIdeTools != null;
+        return boardManager != null || board != null || boardSettings != null || libraries != null || preferences != null
+                || arduinoIdeTools != null;
     }
 
 
@@ -114,6 +125,18 @@ public class ProjectSettings {
             );
         }
 
+        if (this.getPreferences() != null) {
+            this.getPreferences().forEach(p ->
+                sb.append(String.format("%s %s%s::%s::%s%n", SourceExtractor.PREFERENCES_MARKER,
+                        (TextUtils.isNotNullOrBlank(p.board.providerPackage) ? p.board.providerPackage + "::" : ""),
+                        TextUtils.returnAnyNotBlank(p.board.platform, "*"),
+                        TextUtils.returnAnyNotBlank(p.board.name, "*"),
+                        p.preferences.entrySet().stream()
+                                .map(ent -> ent.getKey() + "=" + ent.getValue()).collect(Collectors.joining("||")))
+                )
+            );
+        }
+
         if (this.getArduinoIdeTools() != null) {
             this.getArduinoIdeTools().forEach((k, at) ->
                     sb.append(String.format("%s %s::%s::%s%n", SourceExtractor.ARDUINOTOOL_MARKER, at.name, at.version, at.url))
@@ -131,6 +154,7 @@ public class ProjectSettings {
         Gson gson = new GsonBuilder().disableHtmlEscaping().serializeNulls().setPrettyPrinting()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
                 .registerTypeAdapter(dependentLibraryContainerType, new MapOfDependentLibrariesSerializerCustomizer())
+                .registerTypeAdapter(SourceExtractor.Preferences.class, new PreferencesSerializerCustomizer())
                 .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
         return gson.toJson(projectSettings);
@@ -144,6 +168,7 @@ public class ProjectSettings {
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
                 .registerTypeAdapter(dependentLibraryContainerType, new MapOfDependentLibrariesSerializerCustomizer())
+                .registerTypeAdapter(SourceExtractor.Preferences.class, new PreferencesSerializerCustomizer())
                 .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
         try {
@@ -160,6 +185,7 @@ public class ProjectSettings {
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
         Map<String, SourceExtractor.DependentLibrary> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
+        List<SourceExtractor.Preferences> preferences = sourceExtractor.dependentPreferencesFromMainSketchSource(source);
         List<SourceExtractor.ArduinoTool> arduinoTools = sourceExtractor.arduinoToolsFromMainSketchSource(source);
 
         Map<String, SourceExtractor.ArduinoTool> arduinoToolsMap = null;
@@ -175,6 +201,7 @@ public class ProjectSettings {
         projectSettings.setBoard(board);
         projectSettings.setBoardSettings(boardSettings);
         projectSettings.setLibraries(libraries);
+        projectSettings.setPreferences(preferences);
         projectSettings.setArduinoIdeTools(arduinoToolsMap);
 
         return projectSettings;

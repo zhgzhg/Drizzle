@@ -3,6 +3,7 @@ package com.github.zhgzhg;
 import com.github.zhgzhg.drizzle.utils.json.BoardSettingsSerializerCustomizer;
 import com.github.zhgzhg.drizzle.utils.json.MapOfArduinoToolsSerializerCustomizer;
 import com.github.zhgzhg.drizzle.utils.json.MapOfDependentLibrariesSerializerCustomizer;
+import com.github.zhgzhg.drizzle.utils.json.PreferencesSerializerCustomizer;
 import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
@@ -72,6 +73,7 @@ class DrizzleParsingTest {
         SourceExtractor.Board board = sourceExtractor.dependentBoardFromMainSketchSource(source);
         List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
         Map<String, SourceExtractor.DependentLibrary> libraries = sourceExtractor.dependentLibsFromMainSketchSource(source);
+        List<SourceExtractor.Preferences> preferences = sourceExtractor.dependentPreferencesFromMainSketchSource(source);
         List<SourceExtractor.ArduinoTool> arduinoTools = sourceExtractor.arduinoToolsFromMainSketchSource(source);
         Map<String, SourceExtractor.ArduinoTool> arduinoToolMap = null;
         if (arduinoTools != null && !arduinoTools.isEmpty()) {
@@ -86,6 +88,7 @@ class DrizzleParsingTest {
         projectSettings.setBoard(board);
         projectSettings.setBoardSettings(boardSettings);
         projectSettings.setLibraries(libraries);
+        projectSettings.setPreferences(preferences);
         projectSettings.setArduinoIdeTools(arduinoToolMap);
         return projectSettings;
     }
@@ -105,6 +108,7 @@ class DrizzleParsingTest {
         Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().serializeNulls()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
                 .registerTypeAdapter(dependentLibraryContainerType, new MapOfDependentLibrariesSerializerCustomizer())
+                .registerTypeAdapter(SourceExtractor.Preferences.class, new PreferencesSerializerCustomizer())
                 .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
 
@@ -120,6 +124,7 @@ class DrizzleParsingTest {
         Gson gson = new GsonBuilder()
                 .registerTypeAdapter(SourceExtractor.BoardSettings.class, new BoardSettingsSerializerCustomizer())
                 .registerTypeAdapter(dependentLibraryContainerType, new MapOfDependentLibrariesSerializerCustomizer())
+                .registerTypeAdapter(SourceExtractor.Preferences.class, new PreferencesSerializerCustomizer())
                 .registerTypeAdapter(ardToolsContainerType, new MapOfArduinoToolsSerializerCustomizer())
                 .create();
 

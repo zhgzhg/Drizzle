@@ -13,6 +13,9 @@
  * @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
  * @DependsOn MyAwesomeLib::https://www.myawe.some/file.zip
  * @DependsOn MyAwesomeLib2::https://www.myawe.some/file.git#myrevision
+ * @Preferences *::*::key1=val1||key2=val2=something
+ * @Preferences *::*::*::key1=val1||key2=val2=something
+ * @Preferences a::b::c::key1=val1
  *
  * @ArduinoTool Drizzle::(<=0.2)::file:///somewhere.zip
  * @ArduinoTool Drizzl3::(<=0.3)::file:///somewhere.zip

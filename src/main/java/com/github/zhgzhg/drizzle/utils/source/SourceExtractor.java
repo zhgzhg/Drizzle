@@ -44,6 +44,7 @@ public class SourceExtractor {
     public static final String BOARDMANAGER_MARKER = "@BoardManager";
     public static final String BOARDNAME_MARKER = "@Board";
     public static final String BOARDSETTINGS_MARKER = "@BoardSettings";
+    public static final String PREFERENCES_MARKER = "@Preferences";
     public static final String ARDUINOTOOL_MARKER = "@ArduinoTool";
 
 
@@ -55,6 +56,7 @@ public class SourceExtractor {
     public static final String URL_GROUP = "url";
     public static final String BOARD_GROUP = "board";
     public static final String MENU_GROUP = "boardmenu";
+    public static final String PREFDEF_GROUP = "prefdef";
 
 
     public static final Pattern NEW_LINE_SPLITTER = Pattern.compile("\\R+");
@@ -62,11 +64,14 @@ public class SourceExtractor {
     public static final Pattern BOARD_MANAGER = Pattern.compile("^[^@]*"
             + BOARDMANAGER_MARKER + "\\s+(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + VER_GROUP + ">[^:]+)(::(?<" + URL_GROUP + ">.*))?$");
 
-    public static final Pattern BOARD = Pattern.compile("^[^@]*" + BOARDNAME_MARKER + "\\s+((?<" + PACKAGE_PROVIDER_GROUP + ">[^:]+)::)?"
-                    + "(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">.+)$");
+    public static final Pattern BOARD = Pattern.compile("^[^@]*" + BOARDNAME_MARKER + "\\s+((?<" + PACKAGE_PROVIDER_GROUP
+            + ">[^:]+)::)?" + "(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">.+)$");
 
     public static final Pattern BOARD_SETTINGS = Pattern.compile("^[^@]*"
             + BOARDSETTINGS_MARKER + "\\s+(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">[^:]+)::(?<" + MENU_GROUP + ">.+)$");
+
+    public static final Pattern PREFERENCES = Pattern.compile("^[^@]*" + PREFERENCES_MARKER + "\\s+((?<" + PACKAGE_PROVIDER_GROUP
+            + ">[^:]+)::)?" + "(?<" + PLATFORM_GROUP + ">[^:]+)::(?<" + BOARD_GROUP + ">[^:]+)::(?<" + PREFDEF_GROUP + ">.+)$");
 
     public static final Pattern DEPENDS_ON_LIB_VERSION =
             Pattern.compile("^[^@]*" + DEPENDSON_MARKER + "\\s+(?<" + LIB_GROUP + ">[^:]+)::(?<" + VER_GROUP + ">.+)$");
@@ -109,7 +114,7 @@ public class SourceExtractor {
 
         @Override
         public String toString() {
-            return "Board{providerPackage=\'" + providerPackage + "\', platform='" + platform + '\'' + ", name='" + name + '\'' + '}';
+            return "Board{providerPackage='" + providerPackage + "', platform='" + platform + '\'' + ", name='" + name + '\'' + '}';
         }
     }
 
@@ -117,7 +122,7 @@ public class SourceExtractor {
         public final Board board;
         public final List<List<String>> clickableOptions;
 
-        public BoardSettings(final Board board) {
+        public BoardSettings(Board board) {
             Objects.requireNonNull(board);
             this.board = new Board(
                     board.providerPackage,
@@ -147,6 +152,46 @@ public class SourceExtractor {
         public String toString() {
             return "BoardSettings{" + "board=" + board.toString().replaceFirst("providerPackage='[^']*', ", "")
                     + ", clickableOptions=" + clickableOptions + '}';
+        }
+    }
+
+    public static class Preferences {
+        public final Board board;
+        public final Map<String, String> preferences;
+
+        public Preferences(Board board) {
+            Objects.requireNonNull(board);
+            this.board = new Board(
+                    (TextUtils.isNullOrBlank(board.providerPackage) || "*".equals(board.providerPackage) ? null : board.providerPackage),
+                    (TextUtils.isNullOrBlank(board.platform) || "*".equals(board.platform) ? null : board.platform),
+                    (TextUtils.isNullOrBlank(board.name) || "*".equals(board.name) ? null : board.name)
+            );
+            this.preferences = new LinkedHashMap<>();
+        }
+
+        public boolean suitsRequirements(String providerPackage, String platformName, String boardName) {
+
+            boolean matching = TextUtils.allNullOrBlank(providerPackage, platformName, boardName);
+
+            if (!matching) {
+                if (TextUtils.allNotBlank(board.providerPackage, board.platform, board.name)) {
+                    matching = board.providerPackage.equals(providerPackage) && board.platform.equals(platformName)
+                            && board.name.equals(boardName);
+                } else if (TextUtils.allNotBlank(board.platform, board.name)) {
+                    matching = board.platform.equals(platformName) && board.name.equals(boardName);
+                } else if (TextUtils.isNotNullOrBlank(board.platform)) {
+                    matching = board.platform.equals(platformName);
+                } else if (TextUtils.isNotNullOrBlank(board.name)) {
+                    matching = board.name.equals(boardName);
+                }
+            }
+
+            return matching;
+        }
+
+        @Override
+        public String toString() {
+            return "Preferences{" + "board=" + board + ", preferences=" + preferences + '}';
         }
     }
 
@@ -318,6 +363,56 @@ public class SourceExtractor {
                 }
 
                 result.add(boardSettings);
+            });
+
+            return result;
+        } catch (IOException e) {
+            this.logProxy.cliErrorln(e);
+        }
+
+        return Collections.emptyList();
+    }
+
+    public List<Preferences> dependentPreferencesFromMainSketchSource(String source) {
+        ProjectSettings projectSettings = this.loadAllFromDrizzleJson();
+        if (projectSettings != null) {
+            List<Preferences> preferences = projectSettings.getPreferences();
+            return (preferences != null ? preferences : Collections.emptyList());
+        }
+
+        try {
+            Map<String, Map<String, String>> boardAndPreferences = extractMarkersKeyAndParams(
+                    extractAllCommentsFromSource(source), PREFERENCES, PREFERENCES_MARKER, PACKAGE_PROVIDER_GROUP,
+                    Arrays.asList(PLATFORM_GROUP, BOARD_GROUP, PREFDEF_GROUP)
+            );
+
+            List<Preferences> result = new ArrayList<>(boardAndPreferences.size());
+            boardAndPreferences.forEach((providerPackageName, boardStuff) -> {
+                String platformName = boardStuff.get(PLATFORM_GROUP);
+                String boardName = boardStuff.get(BOARD_GROUP);
+
+                Preferences preferences = new Preferences(new Board(providerPackageName, platformName, boardName));
+
+                String preferenceDefs = boardStuff.get(PREFDEF_GROUP);
+                if (preferenceDefs == null && preferenceDefs.isEmpty()) return;
+
+                List<String> prefDefPairs = Arrays.asList(preferenceDefs.split("\\|\\|"));
+                int lastItemIdx = prefDefPairs.size() - 1;
+                if (prefDefPairs.get(lastItemIdx) == null || prefDefPairs.get(lastItemIdx).isEmpty()) {
+                    prefDefPairs.remove(lastItemIdx);
+                }
+                if (prefDefPairs.isEmpty()) return;
+
+                for (String mc : prefDefPairs) {
+                    List<String> keyAndVal = Arrays.asList(mc.split("=", 2));
+                    if (keyAndVal.size() < 2) {
+                        logProxy.cliError("Cannot extract preference key=value from %s%n", mc);
+                        continue;
+                    }
+                    preferences.preferences.put(keyAndVal.get(0), keyAndVal.get(1));
+                }
+
+                result.add(preferences);
             });
 
             return result;

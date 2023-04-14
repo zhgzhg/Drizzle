@@ -20,7 +20,8 @@ How to Use
 
 1. Create a comment inside the main file of your Arduino sketch (preferably at the beginning).
 
-2. Use markers like `@DependsOn`, `@BoardManager`, `@BoardSettings`, `@Board`, and `@ArduinoTool` to describe the sketch's requirements.
+2. Use markers like `@DependsOn`, `@BoardManager`, `@BoardSettings`, `@Board`, `@Preferences`, and `@ArduinoTool` to describe the sketch's
+requirements.
    
    1. You may use some of the __Tools -> Drizzle -> Auto-generate ... marker__ UI options to let Drizzle fill them as a C-style comment at the
       beginning of your main sketch file, based on IDE's current settings. Depending on the environment the result might require
@@ -50,7 +51,9 @@ An example:
  * @DependsOn Arduino Cloud Provider Examples::*
  * @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
  *
- * @ArduinoTool Drizzle::(<0.15.1)::https://github.com/zhgzhg/Drizzle/releases/download/0.15.1/drizzle-0.15.1-dist.zip
+ * @Preferences esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)::compiler.cpp.extra_flags=-std=gnu++14 -DTEST123
+ *
+ * @ArduinoTool Drizzle::(<0.16.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.16.0/drizzle-0.16.0-dist.zip
  */
 
 // Your sample code follows below just as usual
@@ -147,11 +150,11 @@ Supported Markers
     * `@DependsOn Github's BMP280_DEV::https://github.com/MartinL1/BMP280_DEV.git#V1.0.21`
 
 
-* __@BoardSettings__ _platform_name_::_board_id_ | _board_name_::_menu_path_[->_option_][||_another_menu_path_->option]
+* __@BoardSettings__ _platform_name_::_board_id_ | _board_name_::_menu_path_[->_option_][||_another_menu_path_->option...]
   * Clicks on the UI options provided by a particular board (and platform)
   * Board ID or name can be used. **Board ID matching is attempted first.**
   * __More__ than 1 marker can be used.
-  * To match all platforms and/or board names a * can be used
+  * To match all platforms and/or board ids or board names a * can be used
   * To describe the path to the particular option -> can be used
   * To separate multiple menu paths || can be used
   * Menu matching is case-sensitive
@@ -163,6 +166,19 @@ Supported Markers
     * `@BoardSettings esp32::*::Flash Frequency->40MHz||PSRAM->Disabled`
     * `@BoardSettings *::*::Upload Speed->115200`
 
+* __@Preferences__ [_provider_package_name_::]_platform_name_::_board_id_ | _board_name_::definition=value[||another_definition=another_value...]
+  * At compile time automatically appends arbitrary runtime preference definitions
+  * Board ID or name can be used. **Board ID matching is attempted first.**
+  * __More__ than 1 marker can be used.
+  * All the markers are attempted to be applied while matching against the current selected board.
+  * To match all provider package, platforms and/or board ids or board names a * can be used
+  * The matching is case-sensitive
+  * The matching will be performed in the order of definition, from left to right, and __will stop immediately once a match is found__.
+Always define the concrete rules in the beginning, and the less concrete at the end.
+  * Examples:
+    * `@Preferences esp32::esp32::esp32wrover::compiler.cpp.extra_flags=-std=gnu++17 -DMYDEF||compiler.c.extra_flags=-DMYDEFINITION2`
+    * `@Preferences *::esp32::*::compiler.cpp.extra_flags=-std=gnu++14`
+    * `@Preferences *::*::compiler.cpp.extra_flags=-std=gnu++14`
 
 * __@ArduinoTool__ _tool_name_::_version_::_tool_zip_url_
   * Installs an Arduino tool from __ZIP__ archive into the IDE. The tool is unzipped inside Arduino IDE's installation directory / tools,
@@ -176,7 +192,7 @@ Supported Markers
   * The _tool_name_ must match the name of the directory containing the actual tool. It has to be unique. In the case of several duplicating
     names the first one will be respected.
   * Examples:
-    * `@ArduinoTool Drizzle::(<0.15.1)::https://github.com/zhgzhg/Drizzle/releases/download/0.15.1/drizzle-0.15.1-dist.zip`
+    * `@ArduinoTool Drizzle::(<0.16.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.16.0/drizzle-0.16.0-dist.zip`
     * `@ArduinoTool Drizzle::*::file:///C:/Users/John/Drizzle/drizzle.zip`
     * `@ArduinoTool EspExceptionDecoder::(<=1.0.0)::https://github.com/me-no-dev/EspExceptionDecoder/releases/download/2.0.2/EspExceptionDecoder-2.0.2.zip`
 
@@ -187,7 +203,7 @@ CLI Extras
 Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
 from JSON file Drizzle markers will be produced is also supported.
 
-For e.g. `java -jar drizzle-0.15.1.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.16.0-with-deps.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -233,16 +249,28 @@ For e.g. `java -jar drizzle-0.15.1.jar --parse hello-world.ino` will produce:
       "arduinoCliFmt": "Arduino Cloud Provider Examples"
     }
   },
+  "preferences": [
+    {
+      "board": {
+        "providerPackage": "esp8266",
+        "platform": "esp8266",
+        "name": "NodeMCU 1.0 (ESP-12E Module)"
+      },
+      "preferences": {
+        "compiler.cpp.extra_flags": "-std=gnu++14 -DTEST123"
+      }
+    }
+  ],
   "arduino_ide_tools": {
     "Drizzle": {
-      "version": "(<0.15.1)",
-      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.15.1/drizzle-0.15.1-dist.zip"
+      "version": "(<0.16.0)",
+      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.16.0/drizzle-0.16.0-dist.zip"
     }
   }
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.15.1.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.16.0-with-deps.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
@@ -251,7 +279,8 @@ Executing on the above JSON `java -jar drizzle-0.15.1.jar --rev-parse hello-worl
 @DependsOn BMP280_DEV::(>= 1.0.8 && < 1.0.16)
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
-@ArduinoTool Drizzle::(<0.15.1)::https://github.com/zhgzhg/Drizzle/releases/download/0.15.1/drizzle-0.15.1-dist.zip
+@Preferences esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)::compiler.cpp.extra_flags=-std=gnu++14 -DTEST123
+@ArduinoTool Drizzle::(<0.16.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.16.0/drizzle-0.16.0-dist.zip
 ```
 
 

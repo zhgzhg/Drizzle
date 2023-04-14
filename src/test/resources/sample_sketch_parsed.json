@@ -49,6 +49,40 @@
       "arduinoCliFmt": "Arduino Cloud Provider Examples"
     }
   },
+  "preferences": [
+    {
+      "board": {
+        "providerPackage": "*",
+        "platform": "*",
+        "name": "*"
+      },
+      "preferences": {
+        "key1": "val1",
+        "key2": "val2=something"
+      }
+    },
+    {
+      "board": {
+        "providerPackage": "*",
+        "platform": "*",
+        "name": "*"
+      },
+      "preferences": {
+        "key1": "val1",
+        "key2": "val2=something"
+      }
+    },
+    {
+      "board": {
+        "providerPackage": "a",
+        "platform": "b",
+        "name": "c"
+      },
+      "preferences": {
+        "key1": "val1"
+      }
+    }
+  ],
   "arduino_ide_tools": {
     "Drizzle": {
       "version": "(<=0.2)",
