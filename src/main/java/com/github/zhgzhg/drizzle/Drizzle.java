@@ -121,7 +121,7 @@ public class Drizzle implements Tool {
         this.libraryInstaller = new LibraryInstaller(BaseNoGui.getPlatform(), gpgDetachedSignatureVerifier);
 
         this.normalCompilationHook = new IDECompilationHook(editor, logProxy,
-                (_editor, _logProxy, _context, _origRun) -> {
+                (_editor, _logProxy, _context) -> {
                     String msg = "Compiling with the help of Drizzle...";
                     logProxy.uiInfo(msg);
                     logProxy.cliInfoln(msg);
@@ -155,8 +155,8 @@ public class Drizzle implements Tool {
 
                     SourceExtractor se = new SourceExtractor(_editor, _logProxy);
                     for (SourceExtractor.Preferences pref : se.dependentPreferencesFromMainSketchSource(source)) {
-                        if (pref.suitsRequirements("", targetPlatformName, targetBoardId)
-                                || pref.suitsRequirements("", targetPlatformName, targetBoardName)) {
+                        if (pref.suitsRequirements(targetPackageName, targetPlatformName, targetBoardId)
+                                || pref.suitsRequirements(targetPackageName, targetPlatformName, targetBoardName)) {
 
                             pref.preferences.entrySet().stream()
                                     .forEach(ent -> {
@@ -170,7 +170,7 @@ public class Drizzle implements Tool {
 
                     return true;
                 },
-                (_editor, _logProxy, _context, _origRun) -> {
+                (_editor, _logProxy, _context) -> {
                     _context.keySet().stream().forEach(PreferencesData::remove);
                     return true;
                 });

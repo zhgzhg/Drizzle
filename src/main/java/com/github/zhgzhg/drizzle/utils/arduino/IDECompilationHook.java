@@ -16,7 +16,7 @@ public class IDECompilationHook {
 
     @FunctionalInterface
     public interface HookExecutable {
-        boolean run(Editor editor, LogProxy<EditorConsole> logProxy, Map<String, Object> context, Runnable original);
+        boolean run(Editor editor, LogProxy<EditorConsole> logProxy, Map<String, Object> context);
     }
 
     public static class SketchControllerProxy extends SketchController {
@@ -40,12 +40,12 @@ public class IDECompilationHook {
         public String build(final boolean verbose, final boolean save) throws RunnerException, PreferencesMapException, IOException {
             Map<String, Object> ctx = new ConcurrentHashMap<>();
             String result = null;
-            if (beforeHook == null || beforeHook.run(this.editor, this.logProxy, ctx, null)) {
+            if (beforeHook == null || beforeHook.run(this.editor, this.logProxy, ctx)) {
                 try {
                     result = super.build(verbose, save);
                 } finally {
                     if (afterHook != null) {
-                        afterHook.run(this.editor, this.logProxy, ctx, null);
+                        afterHook.run(this.editor, this.logProxy, ctx);
                     }
                     ctx.clear();
                 }
@@ -61,8 +61,6 @@ public class IDECompilationHook {
     private HookExecutable myBefore;
     private HookExecutable myAfter;
 
-    private Runnable verboseHandler;
-    private Runnable nonverboseHandler;
 
     public IDECompilationHook(Editor editor, LogProxy<EditorConsole> logProxy, HookExecutable before, HookExecutable after) {
 
@@ -70,49 +68,12 @@ public class IDECompilationHook {
         this.logProxy = logProxy;
         this.myBefore = before;
         this.myAfter = after;
-
-
-        try {
-            this.verboseHandler = this.replaceFieldValue(editor, "presentHandler", () -> {
-                Map<String, Object> context = new ConcurrentHashMap<>();
-                if (myBefore == null || myBefore.run(this.editor, this.logProxy, context, verboseHandler)) {
-                    try {
-                        verboseHandler.run();
-                    } finally {
-                        if (myAfter != null) {
-                            myAfter.run(this.editor, this.logProxy, context, verboseHandler);
-                        }
-                        context.clear();
-                    }
-                }
-            });
-        } catch (Exception e) {
-            logProxy.cliErrorln(e);
-        }
-
-        try {
-            this.nonverboseHandler = this.replaceFieldValue(editor, "runHandler", () -> {
-                Map<String, Object> context = new ConcurrentHashMap<>();
-                if (myBefore == null || myBefore.run(this.editor, this.logProxy, context, verboseHandler)) {
-                    try {
-                        nonverboseHandler.run();
-                    } finally {
-                        if (myAfter != null) {
-                            myAfter.run(this.editor, this.logProxy, context, verboseHandler);
-                        }
-                        context.clear();
-                    }
-                }
-            });
-        } catch (Exception e) {
-            logProxy.cliErrorln(e);
-        }
     }
     private <T> T replaceFieldValue(Object from, String fieldName, T newValue) throws NoSuchFieldException, IllegalAccessException {
         Field declaredField = from.getClass().getDeclaredField(fieldName);
         declaredField.setAccessible(true);
         T old = (T) declaredField.get(from);
-        declaredField.set(from, (Object) newValue);
+        declaredField.set(from, newValue);
         return old;
     }
 

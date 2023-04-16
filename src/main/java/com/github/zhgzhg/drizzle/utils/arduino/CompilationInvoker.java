@@ -103,14 +103,14 @@ public class CompilationInvoker {
 
         try {
             Map<String, Object> ctx = new ConcurrentHashMap<>();
-            if (this.beforeCompileHook == null || this.beforeCompileHook.run(this.editor, this.logProxy, ctx,null)) {
+            if (this.beforeCompileHook == null || this.beforeCompileHook.run(this.editor, this.logProxy, ctx)) {
                 try {
                     String dummyVidPid = "";
                     callArduinoBuilder.invoke(compiler, targetBoard, targetBoard.getContainerPlatform(),
                             targetBoard.getContainerPlatform().getContainerPackage(), dummyVidPid, compileAction, out, err);
                 } finally {
                     if (this.afterCompileHook != null) {
-                        this.afterCompileHook.run(this.editor, this.logProxy, ctx, null);
+                        this.afterCompileHook.run(this.editor, this.logProxy, ctx);
                     }
                     ctx.clear();
                 }
