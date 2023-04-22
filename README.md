@@ -284,6 +284,68 @@ Executing on the above JSON `java -jar drizzle-0.16.1-with-deps.jar --rev-parse 
 ```
 
 
+Using in Automated CI/CD Environments
+-------------------------------------
+
+With the help Drizzle's JSON output, `jq`, and `adruino-cli` (or its
+precessor `arduino-builder`) an automatic compilation from the command
+line can be achieved. A couple of examples are given below:
+
+Assuming the execution happens inside
+[arduinoci/ci-arduino-cli container](https://hub.docker.com/r/arduinoci/ci-arduino-cli/tags).
+
+#### Install Drizzle:
+
+```
+DRIZZLE_VER="0.16.1"
+
+set -x
+if [[ ! -f "Drizzle/tool/drizzle-$DRIZZLE_VER-with-deps.jar" ]]; then
+  apt update && apt -y install wget unzip jq openjdk-17-jdk-headless
+  rm -fr Drizzle
+  wget https://github.com/zhgzhg/Drizzle/releases/download/$DRIZZLE_VER/drizzle-$DRIZZLE_VER-dist.zip
+  unzip drizzle-$DRIZZLE_VER-dist.zip
+fi
+```
+
+#### Produce Drizzle JSON file:
+
+```
+java -jar Drizzle/tool/drizzle-$DRIZZLE_VER-with-deps.jar --parse ./my-project >my-project.json
+```
+
+#### Install custom boards from URL, update indexes:
+
+```
+arduino-cli core update-index --additional-urls $(jq -r .board_manager.url ./my-project.json)
+arduino-cli update
+```
+
+#### Extract FQBN, install libraries, extract compile preferences, and run a compilation:
+
+```
+set -x
+
+ARDUINO_LIBRARY_ENABLE_UNSAFE_INSTALL="true" # allows installation from external HTTPS / GIT locations
+
+FQBN=$(jq -r '[.board.providerPackage,.board.platform,.board.name] | "\(.[0]):\(.[1]):\(.[2])"' ./my-project.json)
+
+PP=$(jq -r '[.board.providerPackage] | "\(.[0])"' ./my-project.json)
+PF=$(jq -r '[.board.platform] | "\(.[0])"' ./my-project.json)
+BN=$(jq -r '[.board.name] | "\(.[0])"' ./my-project.json)
+
+while IFS= read -r lib ;
+do
+  arduino-cli lib install -v $lib
+done <<< $(jq -r '.libraries | map(.arduinoCliFmt) | .[]' ./my-project.json)
+BPS=$(jq -r 'first(.preferences | to_entries | .[] | select(((.value.board.providerPackage == "'"$PP"'" and .value.board.platform == "'"$PF"'") or (.value.board.providerPackage == "'*'" and .value.board.platform == "'*'")) and .value.board.name == "'"$BN"'")) | .value.preferences | to_entries | map("--build-property \"" + .key + "=" + .value + "\"") | join(" ")' ./my-project.json)
+eval "BPSE=($BPS)"
+
+
+arduino-cli compile -v --fqbn "$FQBN" "${BPSE[@]}" ./my-project
+```
+
+
 How To Compile
 --------------
 
