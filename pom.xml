@@ -38,19 +38,19 @@
         <semver4j-version>0.16.4</semver4j-version>
         <gson-version>2.10.1</gson-version>
         <zip4j-version>2.11.5</zip4j-version>
-        <jgit-version>5.13.1.202206130422-r</jgit-version>
+        <jgit-version>5.13.2.202306221912-r</jgit-version>
 
-        <junit-jupiter-engine-version>5.9.2</junit-jupiter-engine-version>
-        <junit-jupiter-api-version>5.9.2</junit-jupiter-api-version>
-        <junit-platform-launcher-version>1.9.2</junit-platform-launcher-version>
+        <junit-jupiter-engine-version>5.10.0</junit-jupiter-engine-version>
+        <junit-jupiter-api-version>5.10.0</junit-jupiter-api-version>
+        <junit-platform-launcher-version>1.10.0</junit-platform-launcher-version>
         <apiguardian-api-version>1.1.2</apiguardian-api-version>
 
         <maven-compiler-plugin-version>3.11.0</maven-compiler-plugin-version>
-        <maven-surefire-plugin-version>3.0.0</maven-surefire-plugin-version>
-        <download-maven-plugin-version>1.6.8</download-maven-plugin-version>
-        <maven-assembly-plugin-version>3.5.0</maven-assembly-plugin-version>
-        <maven-shade-plugin-version>3.4.1</maven-shade-plugin-version>
-        <maven-release-plugin-version>3.0.0</maven-release-plugin-version>
+        <maven-surefire-plugin-version>3.1.2</maven-surefire-plugin-version>
+        <download-maven-plugin-version>1.7.1</download-maven-plugin-version>
+        <maven-assembly-plugin-version>3.6.0</maven-assembly-plugin-version>
+        <maven-shade-plugin-version>3.5.0</maven-shade-plugin-version>
+        <maven-release-plugin-version>3.0.1</maven-release-plugin-version>
     </properties>
 
     <dependencies>
@@ -161,7 +161,7 @@
                             <goal>wget</goal>
                         </goals>
                         <configuration>
-                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/6e10f7e59d7e556efc47fa0909b814cb4f596f3a/cpp/CPP14Lexer.g4</url>
+                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/1bc4e236a7c56f5505f7d54429ed31f897a6377e/cpp/CPP14Lexer.g4</url>
                             <outputFileName>CPP14Lexer.g4</outputFileName>
                             <outputDirectory>${project.build.sourceDirectory}/../antlr4/com/github/zhgzhg/drizzle/parser</outputDirectory>
                         </configuration>
@@ -172,7 +172,7 @@
                             <goal>wget</goal>
                         </goals>
                         <configuration>
-                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/6e10f7e59d7e556efc47fa0909b814cb4f596f3a/cpp/CPP14Parser.g4</url>
+                            <url>https://raw.githubusercontent.com/antlr/grammars-v4/1bc4e236a7c56f5505f7d54429ed31f897a6377e/cpp/CPP14Parser.g4</url>
                             <outputFileName>CPP14Parser.g4</outputFileName>
                             <outputDirectory>${project.build.sourceDirectory}/../antlr4/com/github/zhgzhg/drizzle/parser</outputDirectory>
                         </configuration>

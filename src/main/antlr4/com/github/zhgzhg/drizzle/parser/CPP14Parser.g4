@@ -20,9 +20,13 @@
  * ****************************************************************************
  */
 parser grammar CPP14Parser;
+
 options {
 	tokenVocab = CPP14Lexer;
 }
+
+// Insert here @header for C++ parser.
+
 /*Basic concepts*/
 
 translationUnit: declarationseq? EOF;
@@ -118,30 +122,30 @@ unaryExpression:
 	)
 	| Alignof LeftParen theTypeId RightParen
 	| noExceptExpression
-	| newExpression
+	| newExpression_
 	| deleteExpression;
 
 unaryOperator: Or | Star | And | Plus | Tilde | Minus | Not;
 
-newExpression:
+newExpression_:
 	Doublecolon? New newPlacement? (
 		newTypeId
-		| (LeftParen theTypeId RightParen)
-	) newInitializer?;
+		| LeftParen theTypeId RightParen
+	) newInitializer_?;
 
 newPlacement: LeftParen expressionList RightParen;
 
-newTypeId: typeSpecifierSeq newDeclarator?;
+newTypeId: typeSpecifierSeq newDeclarator_?;
 
-newDeclarator:
-	pointerOperator newDeclarator?
+newDeclarator_:
+	pointerOperator newDeclarator_?
 	| noPointerNewDeclarator;
 
 noPointerNewDeclarator:
 	LeftBracket expression RightBracket attributeSpecifierSeq?
 	| noPointerNewDeclarator LeftBracket constantExpression RightBracket attributeSpecifierSeq?;
 
-newInitializer:
+newInitializer_:
 	LeftParen expressionList? RightParen
 	| bracedInitList;
 
@@ -295,7 +299,7 @@ declaration:
 	| explicitSpecialization
 	| linkageSpecification
 	| namespaceDefinition
-	| emptyDeclaration
+	| emptyDeclaration_
 	| attributeDeclaration;
 
 blockDeclaration:
@@ -318,7 +322,7 @@ simpleDeclaration:
 staticAssertDeclaration:
 	Static_assert LeftParen constantExpression Comma StringLiteral RightParen Semi;
 
-emptyDeclaration: Semi;
+emptyDeclaration_: Semi;
 
 attributeDeclaration: attributeSpecifierSeq Semi;
 
@@ -441,7 +445,7 @@ namespaceAliasDefinition:
 qualifiednamespacespecifier: nestedNameSpecifier? namespaceName;
 
 usingDeclaration:
-	Using ((Typename_? nestedNameSpecifier) | Doublecolon) unqualifiedId Semi;
+    Using (Typename_? nestedNameSpecifier | Doublecolon) unqualifiedId Semi;
 
 usingDirective:
 	attributeSpecifierSeq? Using Namespace nestedNameSpecifier? namespaceName Semi;
@@ -562,11 +566,8 @@ parameterDeclarationList:
 	parameterDeclaration (Comma parameterDeclaration)*;
 
 parameterDeclaration:
-	attributeSpecifierSeq? declSpecifierSeq (
-		(declarator | abstractDeclarator?) (
-			Assign initializerClause
-		)?
-	);
+	attributeSpecifierSeq? declSpecifierSeq (declarator | abstractDeclarator?) (Assign initializerClause)?
+	;
 
 functionDefinition:
 	attributeSpecifierSeq? declSpecifierSeq? declarator virtualSpecifierSeq? functionBody;
@@ -623,7 +624,7 @@ memberdeclaration:
 	| staticAssertDeclaration
 	| templateDeclaration
 	| aliasDeclaration
-	| emptyDeclaration;
+	| emptyDeclaration_;
 
 memberDeclaratorList:
 	memberDeclarator (Comma memberDeclarator)*;
@@ -709,7 +710,7 @@ typeParameter:
 	(
 		(Template Less templateparameterList Greater)? Class
 		| Typename_
-	) ((Ellipsis? Identifier?) | (Identifier? Assign theTypeId));
+	) (Ellipsis? Identifier? | Identifier? Assign theTypeId);
 
 simpleTemplateId:
 	templateName Less templateArgumentList? Greater;
