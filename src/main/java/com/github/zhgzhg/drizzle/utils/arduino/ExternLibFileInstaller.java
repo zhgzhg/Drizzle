@@ -1,6 +1,7 @@
 package com.github.zhgzhg.drizzle.utils.arduino;
 
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
+import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import processing.app.BaseNoGui;
 import processing.app.PreferencesData;
 import processing.app.helpers.FileUtils;
@@ -17,6 +18,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 public class ExternLibFileInstaller<T> {
     private final LogProxy<T> logProxy;
@@ -83,7 +85,9 @@ public class ExternLibFileInstaller<T> {
                 try (InputStream propStream = Files.newInputStream(libProp.toPath(), StandardOpenOption.READ)) {
                     Properties properties = new Properties();
                     properties.load(propStream);
-                    List<String> dependencies = Arrays.asList(properties.getProperty("depends", "").split(",\\s*"));
+                    List<String> dependencies = Arrays.stream(properties.getProperty("depends", "").split(",\\s*"))
+                            .filter(TextUtils::anyNotBlank)
+                            .collect(Collectors.toList());
                     dependencies.remove("");
                     this.transitiveDependencies.addAll(dependencies);
                 } catch (Exception e) {

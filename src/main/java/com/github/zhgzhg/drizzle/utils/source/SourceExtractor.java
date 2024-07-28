@@ -350,7 +350,7 @@ public class SourceExtractor {
                 String menus = boardStuff.get(MENU_GROUP);
                 if (menus == null && menus.isEmpty()) return;
 
-                List<String> menusToClick = Arrays.asList(menus.split("\\|\\|"));
+                List<String> menusToClick = Arrays.stream(menus.split("\\|\\|")).collect(Collectors.toCollection(ArrayList::new));
                 int lastItemIdx = menusToClick.size() - 1;
                 if (menusToClick.get(lastItemIdx) == null || menusToClick.get(lastItemIdx).isEmpty()) {
                     menusToClick.remove(lastItemIdx);
@@ -396,7 +396,7 @@ public class SourceExtractor {
                 String preferenceDefs = boardStuff.get(PREFDEF_GROUP);
                 if (preferenceDefs == null && preferenceDefs.isEmpty()) return;
 
-                List<String> prefDefPairs = Arrays.asList(preferenceDefs.split("\\|\\|"));
+                List<String> prefDefPairs = Arrays.stream(preferenceDefs.split("\\|\\|")).collect(Collectors.toCollection(ArrayList::new));
                 int lastItemIdx = prefDefPairs.size() - 1;
                 if (prefDefPairs.get(lastItemIdx) == null || prefDefPairs.get(lastItemIdx).isEmpty()) {
                     prefDefPairs.remove(lastItemIdx);
