@@ -19,6 +19,11 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  * ****************************************************************************
  */
+/**
+* Slightly modified, the original is obtained from:
+* https://raw.githubusercontent.com/antlr/grammars-v4/3c08fa25bd877451c910af0ade146a1f95ef9d67/cpp/CPP14Parser.g4
+*/
+
 parser grammar CPP14Parser;
 
 options {
@@ -535,29 +540,26 @@ abstractDeclarator:
 	| noPointerAbstractDeclarator? parametersAndQualifiers trailingReturnType
 	| abstractPackDeclarator;
 
-pointerAbstractDeclarator:
-	noPointerAbstractDeclarator
-	| pointerOperator+ noPointerAbstractDeclarator?;
+pointerAbstractDeclarator
+    : pointerOperator* (noPointerAbstractDeclarator | pointerOperator)
+    ;
 
-noPointerAbstractDeclarator:
-	noPointerAbstractDeclarator (
-		parametersAndQualifiers
-		| noPointerAbstractDeclarator LeftBracket constantExpression? RightBracket
-			attributeSpecifierSeq?
-	)
-	| parametersAndQualifiers
-	| LeftBracket constantExpression? RightBracket attributeSpecifierSeq?
-	| LeftParen pointerAbstractDeclarator RightParen;
+noPointerAbstractDeclarator
+    : (parametersAndQualifiers | LeftParen pointerAbstractDeclarator RightParen) (
+        parametersAndQualifiers
+        | LeftBracket constantExpression? RightBracket attributeSpecifierSeq?
+    )*
+    ;
 
 abstractPackDeclarator:
 	pointerOperator* noPointerAbstractPackDeclarator;
 
-noPointerAbstractPackDeclarator:
-	noPointerAbstractPackDeclarator (
+noPointerAbstractPackDeclarator
+	: Ellipsis (
 		parametersAndQualifiers
 		| LeftBracket constantExpression? RightBracket attributeSpecifierSeq?
-	)
-	| Ellipsis;
+	)*
+	;
 
 parameterDeclarationClause:
 	parameterDeclarationList (Comma? Ellipsis)?;
