@@ -171,9 +171,9 @@ Supported Markers
   * Board ID or name can be used. **Board ID matching is attempted first.**
   * __More__ than 1 marker can be used.
   * All the markers are attempted to be applied while matching against the current selected board.
-  * To match all provider package, platforms and/or board ids or board names a * can be used
+  * To match all provider packages, platforms, and/or board ids or board names a * can be used
   * The matching is case-sensitive
-  * The matching will be performed in the order of definition, from left to right, and __will stop immediately once a match is found__.
+  * The matching will be performed in the order of definition - from top to bottom and from left to right and __will stop immediately once a match is found__.
 Always define the concrete rules in the beginning, and the less concrete at the end.
   * Examples:
     * `@Preferences esp32::esp32::esp32wrover::compiler.cpp.extra_flags=-std=gnu++17 -MMD -c -DMY_DEFINITION||compiler.c.extra_flags=-DMYDEFINITION2`
@@ -287,7 +287,7 @@ Executing on the above JSON `java -jar drizzle-0.16.4-with-deps.jar --rev-parse 
 Using in Automated CI/CD Environments
 -------------------------------------
 
-With the help Drizzle's JSON output, `jq`, and `adruino-cli` (or its
+With the help Drizzle's JSON output, `jq`, and `arduino-cli` (or its
 precessor `arduino-builder`) an automatic compilation from the command
 line can be achieved. A couple of examples are given below:
 
