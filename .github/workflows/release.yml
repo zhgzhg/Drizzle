@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -18,8 +18,8 @@ jobs:
         id: vars
         run: echo ::set-output name=tag::${GITHUB_REF:10}
 
-      - name: Setup Java JDK
-        uses: actions/setup-java@v4
+      - name: Setup JDK
+        uses: actions/setup-java@v5
         with:
           distribution: 'zulu'
           java-version: '8'
