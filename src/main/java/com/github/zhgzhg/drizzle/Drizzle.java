@@ -501,6 +501,7 @@ public class Drizzle implements Tool {
 
         try {
             BaseNoGui.indexer.parseIndex();
+            BaseNoGui.indexer.syncWithFilesystem();
         } catch (Exception e) {
             e.printStackTrace(this.logProxy.stderr());
             return 0;
