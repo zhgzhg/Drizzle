@@ -141,14 +141,4 @@ public class TextUtils {
         }
         return null;
     }
-
-    public static String reversedCollectionToString(Collection<?> collection) {
-        if (collection == null) return "null";
-
-        return collection.stream()
-                .collect(Collectors.collectingAndThen(
-                        Collectors.toList(),
-                        c -> { Collections.reverse(c); return c; }))
-                .toString();
-    }
 }

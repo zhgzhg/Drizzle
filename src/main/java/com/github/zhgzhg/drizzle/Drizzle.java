@@ -48,17 +48,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.time.Instant;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -526,8 +517,23 @@ public class Drizzle implements Tool {
 
         List<String> candidateVersions = possiblePlatforms.stream().map(ContributedPlatform::getParsedVersion).collect(Collectors.toList());
 
+        Comparator<String> possiblyUnnaturalSemverComparator = (v1, v2) -> {
+            try {
+                Version ver1 = Version.fromString(v1);
+                Version ver2 = Version.fromString(v2);
+                return Comparator.<Version>reverseOrder().compare(ver1, ver2);
+            } catch (Exception e) {
+                // don't care
+            }
+            return 0;
+        };
+
         this.logProxy.cliInfo("%s - required: %s, candidates: %s%n", bmSettings.platform, bmSettings.version,
-                TextUtils.reversedCollectionToString(candidateVersions));
+                candidateVersions.stream()
+                        .sorted(possiblyUnnaturalSemverComparator)
+                        .collect(Collectors.toList())
+                        .toString()
+        );
 
         String chosenVersion = SemVer.maxSatisfying(candidateVersions, bmSettings.version);
         if (TextUtils.isNotNullOrBlank(chosenVersion)) {
@@ -661,10 +667,25 @@ public class Drizzle implements Tool {
             }
 
             List<String> installCandidateVersions = installCandidates.stream()
-                    .map(ContributedLibrary::getParsedVersion).collect(Collectors.toList());
+                    .map(ContributedLibrary::getParsedVersion)
+                    .collect(Collectors.toList());
+
+            Comparator<String> possiblyUnnaturalSemverComparator = (v1, v2) -> {
+                try {
+                    Version ver1 = Version.fromString(v1);
+                    Version ver2 = Version.fromString(v2);
+                    return Comparator.<Version>reverseOrder().compare(ver1, ver2);
+                } catch (Exception e) {
+                    // don't care
+                }
+                return 0;
+            };
 
             this.logProxy.cliInfo("%s - required: %s, candidates: %s%n", libName, libVer,
-                    TextUtils.reversedCollectionToString(installCandidateVersions));
+                    installCandidateVersions.stream()
+                            .sorted(possiblyUnnaturalSemverComparator)
+                            .collect(Collectors.toList()).toString()
+            );
 
             if (installLibraryFromURI(libName, libVer, requiredLibs.keySet())) {
                 ++installedLibrariesCount;
