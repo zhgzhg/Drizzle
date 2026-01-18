@@ -97,9 +97,13 @@ public class ExternLibFileInstaller<T> {
 
             // copy folder
             File destinationFolder = new File(BaseNoGui.getSketchbookLibrariesFolder().folder, sourceFile.getName());
+            if (destinationFolder.exists()) {
+                this.logProxy.cliInfo("Replacing existing library %s%n", sourceFile.getName());
+                FileUtils.recursiveDelete(destinationFolder);
+            }
             if (!destinationFolder.mkdir()) {
-                this.logProxy.cliInfo("Library %s already exists - skipped!%n", sourceFile.getName());
-                return true;
+                this.logProxy.cliError("Cannot create a directory library %s%n", sourceFile.getName());
+                return false;
             }
             try {
                 FileUtils.copy(sourceFile, destinationFolder);
