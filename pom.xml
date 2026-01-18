@@ -40,17 +40,17 @@
         <zip4j-version>2.11.5</zip4j-version>
         <jgit-version>5.13.5.202508271544-r</jgit-version>
 
-        <junit-jupiter-engine-version>5.14.1</junit-jupiter-engine-version>
-        <junit-jupiter-api-version>5.14.1</junit-jupiter-api-version>
-        <junit-platform-launcher-version>1.14.1</junit-platform-launcher-version>
+        <junit-jupiter-engine-version>5.14.2</junit-jupiter-engine-version>
+        <junit-jupiter-api-version>5.14.2</junit-jupiter-api-version>
+        <junit-platform-launcher-version>1.14.2</junit-platform-launcher-version>
         <apiguardian-api-version>1.1.2</apiguardian-api-version>
 
         <maven-compiler-plugin-version>3.14.1</maven-compiler-plugin-version>
         <maven-surefire-plugin-version>3.5.4</maven-surefire-plugin-version>
         <download-maven-plugin-version>1.13.0</download-maven-plugin-version>
-        <maven-assembly-plugin-version>3.7.1</maven-assembly-plugin-version>
+        <maven-assembly-plugin-version>3.8.0</maven-assembly-plugin-version>
         <maven-shade-plugin-version>3.6.1</maven-shade-plugin-version>
-        <maven-release-plugin-version>3.2.0</maven-release-plugin-version>
+        <maven-release-plugin-version>3.3.1</maven-release-plugin-version>
     </properties>
 
     <dependencies>
