@@ -2,7 +2,8 @@
 name: drizzle-arduino
 description: Build Arduino sketches and install their dependencies through a running Arduino IDE 1.8.19 with
   the Drizzle plugin. Use when asked to compile/verify an Arduino sketch, or to fetch the boards, libraries and
-  board settings that its Drizzle markers (@BoardManager, @Board, @BoardSettings, @DependsOn, @Preferences) declare.
+  board settings that its Drizzle markers (@BoardManager, @Board, @BoardSettings, @DependsOn, @Preferences) or its
+  drizzle.json declare.
 ---
 
 # Drizzle remote control
@@ -17,14 +18,24 @@ The launcher is (re)written every time the IDE starts with Drizzle. If it's miss
 `drizzle --remote list` reports no instances (exit code 3), ask the user to start Arduino IDE 1.8.19 with
 Drizzle 0.17.0 or newer installed.
 
+## Markers and drizzle.json
+
+A sketch declares what it needs (platform, board, board options, libraries, build properties) either in a
+`drizzle.json` file in the sketch folder, or, when there is none, as Drizzle markers in a comment at the top of its
+main `.ino` file. A `drizzle.json` takes over completely: markers in the `.ino` are then ignored. `apply-markers`
+installs and selects what is declared, and every compile applies the build properties.
+
+Before writing or changing these declarations, read [references/markers.md](references/markers.md). To check your
+changes, run `drizzle --parse <sketch folder>`: it shows what Drizzle will use, from whichever source applies.
+
 ## Workflow
 
 Always pass the absolute path of the sketch folder (or its main `.ino` file).
 
 1. `drizzle --remote list` shows the running IDEs and the sketches they have open.
 2. If the sketch isn't open in any IDE (exit code 4): `drizzle --remote open --sketch <path>`.
-3. `drizzle --remote apply-markers --sketch <path>` installs the platform and libraries declared by the markers
-   and selects the board and its options. Run it before the first compile, after changing any marker, and before
+3. `drizzle --remote apply-markers --sketch <path>` installs the platform and libraries the sketch declares
+   and selects the board and its options. Run it before the first compile, after changing the declarations, and before
    compiling a different sketch: the IDE has one board selection, shared by all its windows.
    `result.problems` lists what couldn't be installed or selected.
 4. `drizzle --remote compile --sketch <path>` compiles exactly like the IDE's Verify button, including
@@ -35,11 +46,13 @@ Other commands:
 
 - `drizzle --remote autogen-markers --sketch <path> [--mode board|all]` returns suggested markers based on the
   IDE's current board selection (`board`), plus the libraries found by a compilation (`all`, the default).
-  Nothing is written: copy what you need into the comment block at the top of the main `.ino` file yourself.
+  Nothing is written: copy what you need into the sketch's markers or `drizzle.json` yourself.
 - `drizzle --remote list-fqbns [--sketch <path>]` lists the boards the IDE knows, as `package:platform:board`.
+  Markers separate these parts with `::` instead of `:`; see the reference.
 - `drizzle --remote status --sketch <path>` shows the IDE's state: selected board, open sketches, unsaved
   changes, the running job.
-- `drizzle --parse <sketch>` prints a sketch's markers as JSON without needing the IDE.
+- `drizzle --parse <sketch folder>` prints what the sketch declares (its `drizzle.json`, or else its markers) as JSON,
+  without needing the IDE.
 
 ## Results
 
@@ -77,5 +90,5 @@ marked with @ArduinoTool and to restart the IDE afterwards.
 ## Rules
 
 - Edit sketch files on disk; before each command Drizzle shows the files you changed, added or deleted in the IDE.
-- Edit Drizzle markers in the sketch yourself rather than asking the IDE to insert them.
+- Edit the markers or `drizzle.json` yourself rather than asking the IDE to insert markers.
 - Don't edit Arduino's `preferences.txt` or files inside the Arduino installation.
