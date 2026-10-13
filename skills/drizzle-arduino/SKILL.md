@@ -15,7 +15,7 @@ launcher, which finds the right IDE instance and handles the connection details:
 
 The launcher is (re)written every time the IDE starts with Drizzle. If it's missing, or
 `drizzle --remote list` reports no instances (exit code 3), ask the user to start Arduino IDE 1.8.19 with
-Drizzle 0.16.8 or newer installed.
+Drizzle 0.17.0 or newer installed.
 
 ## Workflow
 

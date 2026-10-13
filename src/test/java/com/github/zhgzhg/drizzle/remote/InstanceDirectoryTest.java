@@ -25,7 +25,7 @@ class InstanceDirectoryTest {
         info.host = "127.0.0.1";
         info.port = 4242;
         info.token = "secret";
-        info.drizzleVersion = "0.16.8";
+        info.drizzleVersion = "0.17.0";
         info.ideVersion = "1.8.19";
         info.startedAt = "2026-10-12T10:00:00Z";
         return info;
