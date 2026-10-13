@@ -1,5 +1,7 @@
 package com.github.zhgzhg.drizzle;
 
+import com.github.zhgzhg.drizzle.remote.Launcher;
+import com.github.zhgzhg.drizzle.remote.RemoteCLI;
 import com.github.zhgzhg.drizzle.utils.json.ProjectSettings;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
@@ -10,6 +12,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 public class DrizzleCLI {
 
@@ -26,7 +29,14 @@ public class DrizzleCLI {
             System.out.printf("Usage:%n");
             System.out.printf("\tjava -jar drizzle-%s.jar --parse <arduino-proj.ino | arduino-proj-directory>%n", implementationVersion);
             System.out.printf("\tjava -jar drizzle-%s.jar --rev-parse <file.json>%n", implementationVersion);
+
+            System.out.printf("%n\tControls a running Arduino IDE %s with Drizzle (prints JSON):%n%n", "1.8.19");
+            System.out.print(RemoteCLI.usage("drizzle"));
+            System.out.printf("%n\t\"drizzle\" is the launcher Arduino IDE writes into %s%n", Launcher.defaultDirectory());
             return;
+        }
+        if (args.length > 0 && "--remote".equals(args[0])) {
+            System.exit(RemoteCLI.run(Arrays.copyOfRange(args, 1, args.length)));
         }
         if (args.length < 2) {
             System.out.println("Incorrect arguments! Use -h or --help for more information!");

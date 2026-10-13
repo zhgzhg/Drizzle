@@ -10,6 +10,11 @@ import cc.arduino.contributions.packages.ContributionInstaller;
 import cc.arduino.view.NotificationPopup;
 import com.github.gundy.semver4j.SemVer;
 import com.github.gundy.semver4j.model.Version;
+import com.github.zhgzhg.drizzle.remote.ActivityGuard;
+import com.github.zhgzhg.drizzle.remote.IDERemoteCommandHandler;
+import com.github.zhgzhg.drizzle.remote.RemoteControl;
+import com.github.zhgzhg.drizzle.remote.RemoteException;
+import com.github.zhgzhg.drizzle.remote.RemoteProtocol;
 import com.github.zhgzhg.drizzle.utils.arduino.ArduinoIDEToolsInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
@@ -35,6 +40,7 @@ import processing.app.debug.RunnerException;
 import processing.app.debug.TargetBoard;
 import processing.app.debug.TargetPackage;
 import processing.app.debug.TargetPlatform;
+import processing.app.helpers.PreferencesMapException;
 import processing.app.tools.Tool;
 
 import javax.swing.*;
@@ -44,6 +50,7 @@ import java.awt.event.ComponentAdapter;
 import java.awt.event.ComponentEvent;
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -67,6 +74,12 @@ public class Drizzle implements Tool {
     public static final String MENU_ARDUINO_TOOL_INSTALL_TITLE = "Install tools marked with @ArduinoTool";
     public static final String MENU_ABOUT_DRIZZLE_TITLE = "About Drizzle";
 
+    /** Remote control is offered only in Arduino IDE 1.8.19, the final 1.x release, whose internals it relies on. */
+    public static final int REMOTE_CONTROL_ARDUINO_REVISION = 10819;
+    public static final String MENU_CANCEL_REMOTE_COMMAND_TITLE = "Cancel Remote Command";
+
+    private static final String BUILD_VERBOSE_PREFERENCE = "build.verbose";
+
     private final GPGDetachedSignatureVerifier gpgDetachedSignatureVerifier = new GPGDetachedSignatureVerifier();
     private Editor editor;
     private IDECompilationHook normalCompilationHook;
@@ -79,11 +92,15 @@ public class Drizzle implements Tool {
     private LogProxy<EditorConsole> logProxy;
     private UILocator uiLocator;
 
+    // what went wrong while applying markers, reported to remote callers; the menu is disabled while applying
+    private final List<String> applyProblems = Collections.synchronizedList(new ArrayList<>());
+
     private JMenuItem applyDrizzleMarkersMenu = new JMenuItem(MENU_APPLY_MARKERS_TITLE);
     private JMenuItem boardSettingsAndDependenciesGeneratorMenu = new JMenuItem(MENU_AUTOGEN_ALL_MARKERS_TITLE);
     private JMenuItem boardAndSettingsGeneratorMenu = new JMenuItem(MENU_AUTOGEN_BOARD_MARKERS_TITLE);
     private JMenuItem availableBoardFqdnListMenu = new JMenuItem(MENU_SHOW_AVAILABLE_FBNS_TITLE);
     private JMenuItem arduinoToolInstallMenu = new JMenuItem(MENU_ARDUINO_TOOL_INSTALL_TITLE);
+    private JMenuItem cancelRemoteCommandMenu = new JMenuItem(MENU_CANCEL_REMOTE_COMMAND_TITLE);
     private JMenuItem aboutDrizzleMenu = new JMenuItem(MENU_ABOUT_DRIZZLE_TITLE);
 
     @Override
@@ -177,21 +194,22 @@ public class Drizzle implements Tool {
             @Override
             public void actionPerformed(final ActionEvent e) {
                 if (getPrimarySketchTabIfOpened() != null) {
+                    ActivityGuard.Lease lease = tryLocalActivity(MENU_AUTOGEN_ALL_MARKERS_TITLE);
+                    if (lease == null) return;
+
                     new Thread(() -> {
-                        MutableBoolean hadCompilationIssues = new MutableBoolean();
-                        List<String> dependencyMarkers = autogenDependencyMarkers(e, hadCompilationIssues);
-                        List<String> boardAndSettingsMarkers = autogenBoardAndBoardSettingsMarkers(e);
+                        try {
+                            MutableBoolean hadCompilationIssues = new MutableBoolean();
+                            insertCommentBlockWithMarkersAtStartOfTheCurrentTab(generateMarkers(true, hadCompilationIssues));
 
-                        boardAndSettingsMarkers.add("");
-                        boardAndSettingsMarkers.addAll(dependencyMarkers);
-
-                        insertCommentBlockWithMarkersAtStartOfTheCurrentTab(boardAndSettingsMarkers);
-
-                        if (!hadCompilationIssues.get()) {
-                            logProxy.cliInfoln("Marker generation is done! Don't forget to save your sketch.");
-                        } else {
-                            String partialErrMsg = "The compilation finished with an error! The marker generation is done, but may be incomplete!";
-                            logProxy.uiError(partialErrMsg); // the error will be displayed in the console as well
+                            if (!hadCompilationIssues.get()) {
+                                logProxy.cliInfoln("Marker generation is done! Don't forget to save your sketch.");
+                            } else {
+                                String partialErrMsg = "The compilation finished with an error! The marker generation is done, but may be incomplete!";
+                                logProxy.uiError(partialErrMsg); // the error will be displayed in the console as well
+                            }
+                        } finally {
+                            lease.close();
                         }
                     }).start();
                 }
@@ -201,8 +219,12 @@ public class Drizzle implements Tool {
             @Override
             public void actionPerformed(final ActionEvent e) {
                 if (getPrimarySketchTabIfOpened() != null) {
-                    insertCommentBlockWithMarkersAtStartOfTheCurrentTab(autogenBoardAndBoardSettingsMarkers(e));
-                    logProxy.cliInfoln("Marker generation is done! Don't forget to save your sketch.");
+                    try (ActivityGuard.Lease lease = tryLocalActivity(MENU_AUTOGEN_BOARD_MARKERS_TITLE)) {
+                        if (lease == null) return;
+
+                        insertCommentBlockWithMarkersAtStartOfTheCurrentTab(generateMarkers(false, new MutableBoolean()));
+                        logProxy.cliInfoln("Marker generation is done! Don't forget to save your sketch.");
+                    }
                 }
             }
         });
@@ -213,13 +235,7 @@ public class Drizzle implements Tool {
                 logProxy.cliInfoln("PackageID:PlatformID:BoardID");
                 logProxy.cliInfoln("----------------------------\n");
 
-                BaseNoGui.packages.values().stream()
-                        .flatMap(targetPackage -> targetPackage.platforms().stream())
-                        .flatMap(targetPlatform -> targetPlatform.getBoards().values().stream())
-                        .map(targetBoard -> targetBoard.getFQBN())
-                        .distinct()
-                        .sorted()
-                        .forEach(logProxy::cliInfoln);
+                availableFqbns().forEach(logProxy::cliInfoln);
 
                 logProxy.cliInfoln("\nTo use in Drizzle use double colons (::) as a separator.");
             }
@@ -227,45 +243,27 @@ public class Drizzle implements Tool {
         this.arduinoToolInstallMenu.addActionListener(new AbstractAction() {
             @Override
             public void actionPerformed(final ActionEvent e) {
+                ActivityGuard.Lease lease = tryLocalActivity(MENU_ARDUINO_TOOL_INSTALL_TITLE);
+                if (lease == null) return;
+
                 new Thread(() -> {
-                    logProxy.uiInfo("                                                                                                                                                                                                               ");
-                    String source;
                     try {
-                        source = SourceExtractor.loadSourceFromPrimarySketch(editor);
-                    } catch (IOException ex) {
-                        logProxy.cliErrorln(ex);
-                        logProxy.uiError(ex.getMessage());
-                        return;
+                        installArduinoTools();
+                    } finally {
+                        lease.close();
                     }
-
-                    SourceExtractor se = new SourceExtractor(editor, logProxy);
-                    List<SourceExtractor.ArduinoTool> arduinoTools = se.arduinoToolsFromMainSketchSource(source);
-
-                    ArduinoIDEToolsInstaller toolsInstaller = new ArduinoIDEToolsInstaller(logProxy);
-
-                    int installedToolsCount = 0;
-                    for (SourceExtractor.ArduinoTool at : arduinoTools) {
-                        String installedVer = toolsInstaller.extractInstalledToolVersion(at.name);
-                        if (installedVer == null || (!installedVer.isEmpty() && SemVer.satisfies(installedVer, at.version))) {
-                            logProxy.cliInfo("Installing %s from %s...%n", at.name, at.url);
-                            if (toolsInstaller.installTool(at.name, at.url)) {
-                                ++installedToolsCount;
-                                logProxy.cliInfo("Successfully installed %s!%n", at.name);
-                            } else {
-                                logProxy.cliError("Failed installing %s!%n", at.name);
-                            }
-                        } else {
-                            logProxy.cliInfo("Skipped the installation of %s.%n", at.name);
-                        }
-                    }
-
-                    if (installedToolsCount > 0) {
-                        logProxy.uiInfo("You'll have to restart Arduino IDE in for the new tools to get loaded.");
-                        logProxy.cliInfoln("Please restart the IDE in order to load the newly installed tools.");
-                    }
-
-                    logProxy.cliInfoln("Finished installing Arduino IDE tools.");
                 }).start();
+            }
+        });
+
+        this.cancelRemoteCommandMenu.addActionListener(e -> {
+            String cancelled = ActivityGuard.cancelRemote();
+            if (cancelled == null) {
+                logProxy.uiInfo("No remote command is running.");
+            } else {
+                logProxy.uiInfo("Cancelled %s.", cancelled);
+                logProxy.cliWarn("Cancelled %s. A compilation or download it already started may still finish in the background.%n",
+                        cancelled);
             }
         });
 
@@ -296,6 +294,9 @@ public class Drizzle implements Tool {
                             drizzleMenus.add(boardSettingsAndDependenciesGeneratorMenu);
                             drizzleMenus.add(availableBoardFqdnListMenu);
                             drizzleMenus.add(arduinoToolInstallMenu);
+                            if (isRemoteControlSupported()) {
+                                drizzleMenus.add(cancelRemoteCommandMenu);
+                            }
                             drizzleMenus.add(aboutDrizzleMenu);
 
                             m.add(drizzleMenus, index);
@@ -314,28 +315,36 @@ public class Drizzle implements Tool {
                     }
 
                     normalCompilationHook.hookOnSketchController();
+                    enableRemoteControl();
 
-                    if (!UpdateUtils.isTheLatestVersion(logProxy)) {
-                        final NotificationPopup[] notificationHolder = new NotificationPopup[1];
-                        notificationHolder[0] = UpdateUtils.createNewVersionPopupNotification(editor, logProxy,
-                                "Install the update & close the IDE", () -> {
+                    // the update check asks GitHub; off the UI thread, so a slow network doesn't freeze the IDE
+                    Thread updateCheck = new Thread(() -> {
+                        if (UpdateUtils.isTheLatestVersion(logProxy)) return;
 
-                                notificationHolder[0].close();
-                                ArduinoIDEToolsInstaller drizzleInstaller = new ArduinoIDEToolsInstaller(logProxy);
-                                logProxy.cliInfo("Downloading & installing the latest version of Drizzle (please wait)... ");
+                        SwingUtilities.invokeLater(() -> {
+                            final NotificationPopup[] notificationHolder = new NotificationPopup[1];
+                            notificationHolder[0] = UpdateUtils.createNewVersionPopupNotification(editor, logProxy,
+                                    "Install the update & close the IDE", () -> {
 
-                                boolean isSuccess = drizzleInstaller.installTool(MENUS_HOLDER_TITLE, UpdateUtils.latestVersionOfDistZIP());
-                                if (isSuccess) {
-                                    drizzleInstaller.selfDestroyJarOnExit();
-                                    logProxy.cliWarn("succeeded!%nThe Arduino IDE will be closed in 10 seconds...%n");
-                                    drizzleInstaller.killJVM(10);
-                                } else {
-                                    logProxy.cliError("failed! Please try again later.%n");
+                                    notificationHolder[0].close();
+                                    ArduinoIDEToolsInstaller drizzleInstaller = new ArduinoIDEToolsInstaller(logProxy);
+                                    logProxy.cliInfo("Downloading & installing the latest version of Drizzle (please wait)... ");
+
+                                    boolean isSuccess = drizzleInstaller.installTool(MENUS_HOLDER_TITLE, UpdateUtils.latestVersionOfDistZIP());
+                                    if (isSuccess) {
+                                        drizzleInstaller.selfDestroyJarOnExit();
+                                        logProxy.cliWarn("succeeded!%nThe Arduino IDE will be closed in 10 seconds...%n");
+                                        drizzleInstaller.killJVM(10);
+                                    } else {
+                                        logProxy.cliError("failed! Please try again later.%n");
+                                    }
                                 }
-                            }
-                        );
-                        notificationHolder[0].begin();
-                    }
+                            );
+                            notificationHolder[0].begin();
+                        });
+                    }, "drizzle-update-check");
+                    updateCheck.setDaemon(true);
+                    updateCheck.start();
                 });
             }
         });
@@ -348,6 +357,20 @@ public class Drizzle implements Tool {
 
     @Override
     public void run() {
+        ActivityGuard.Lease lease = tryLocalActivity(MENU_APPLY_MARKERS_TITLE);
+        if (lease == null) return;
+
+        prepareConsoleForApplyingMarkers();
+        new Thread(() -> {
+            try {
+                applyMarkers();
+            } finally {
+                lease.close();
+            }
+        }).start();
+    }
+
+    private void prepareConsoleForApplyingMarkers() {
         this.uiLocator.editorConsole().ifPresent(editorConsole -> {
             editorConsole.clear();
             this.logProxy.setEditorConsole(new LogProxy.EditorConsoleSupplierAndSetter<EditorConsole>() {
@@ -364,11 +387,21 @@ public class Drizzle implements Tool {
         });
 
         this.logProxy.uiInfo("                                                                                                                                                                                                               ");
+    }
 
-        new Thread(() -> {
-            Optional<JMenuItem> drizzleMenu = uiLocator.drizzleMenu();
-            drizzleMenu.ifPresent(dm -> dm.setEnabled(false));
+    /**
+     * Installs the platform and the libraries the markers require, then selects the board and its options.
+     * Long-running: call it outside the event dispatch thread.
+     *
+     * @return the outcome, for remote callers
+     */
+    private Map<String, Object> applyMarkers() {
+        Optional<JMenuItem> drizzleMenu = uiLocator.drizzleMenu();
+        drizzleMenu.ifPresent(dm -> dm.setEnabled(false));
 
+        Map<String, Object> result = new LinkedHashMap<>();
+        this.applyProblems.clear();
+        try {
             int installedBoardsCount = installBoards();
             if (installedBoardsCount == 0) {
                 this.logProxy.cliErrorln("No platform definitions managed by " + SourceExtractor.BOARDMANAGER_MARKER
@@ -388,14 +421,25 @@ public class Drizzle implements Tool {
                         + " marker in the main sketch file was found");
             }
 
-            if (selectBoardOptions() == 0) {
+            int clickedBoardOptions = selectBoardOptions();
+            if (clickedBoardOptions == 0) {
                 this.logProxy.cliInfoln("No clickable board options specified with " + SourceExtractor.BOARDSETTINGS_MARKER
                         + " marker were matched");
             }
 
+            List<String> problems;
+            synchronized (this.applyProblems) {
+                problems = new ArrayList<>(new LinkedHashSet<>(this.applyProblems));
+            }
+            result.put("ok", problems.isEmpty() && installedBoardsCount != 0 && installedLibsCount >= 0);
+            result.put("problems", problems);
+            result.put("boardOptionsClicked", Math.max(clickedBoardOptions, 0));
+        } finally {
             drizzleMenu.ifPresent(dm -> dm.setEnabled(true));
-            this.logProxy.cliInfoln("Done!");
-        }).start();
+        }
+
+        this.logProxy.cliInfoln("Done!");
+        return result;
     }
 
     private int selectBoard() {
@@ -442,6 +486,7 @@ public class Drizzle implements Tool {
 
         if (targetBoard == null) {
             this.logProxy.cliErrorln("Failed to pick board based on " + board);
+            this.applyProblems.add("No installed board matches " + SourceExtractor.BOARDNAME_MARKER + " " + board);
             return -1;
         }
 
@@ -468,6 +513,7 @@ public class Drizzle implements Tool {
             this.logProxy.cliInfo("Selected board %s%n", targetBoard.getName());
         } catch (Exception e) {
             e.printStackTrace(this.logProxy.stderr());
+            this.applyProblems.add("Selecting board " + targetBoard.getName() + " failed: " + e);
         }
 
         return 1;
@@ -480,6 +526,7 @@ public class Drizzle implements Tool {
         } catch (IOException e) {
             this.logProxy.cliErrorln(e);
             this.logProxy.uiError(e.getMessage());
+            this.applyProblems.add("Couldn't read the main sketch file: " + e.getMessage());
             return -1;
         }
 
@@ -504,6 +551,7 @@ public class Drizzle implements Tool {
             BaseNoGui.indexer.syncWithFilesystem();
         } catch (Exception e) {
             e.printStackTrace(this.logProxy.stderr());
+            this.applyProblems.add("Couldn't load the platform index: " + e);
             return 0;
         }
 
@@ -548,6 +596,7 @@ public class Drizzle implements Tool {
             if (refreshUI) rebuildBoardMenuUI();
         } else {
             this.logProxy.cliError("Failed to pick version for platform %s, expression %s%n", bmSettings.platform, bmSettings.version);
+            this.applyProblems.add(String.format("No version of platform %s matches %s", bmSettings.platform, bmSettings.version));
         }
 
         return 1;
@@ -575,9 +624,11 @@ public class Drizzle implements Tool {
             int printIndex = platformToInstall.isDownloaded() ? 1 : 20;
             this.progressPrinter.begin(1, printIndex, printIndex * 80, ".");
             try {
-                this.contributionInstaller.install(platformToInstall, this.progressListener);
+                // messages of the platform's post-install script; failures to install throw instead
+                List<String> scriptMessages = this.contributionInstaller.install(platformToInstall, this.progressListener);
                 refreshUI = true;
                 this.logProxy.cliInfoln(" done!");
+                if (scriptMessages != null) scriptMessages.forEach(this.logProxy::cliWarnln);
             } catch (Exception e) {
                 if (e.getMessage() != null && e.getMessage().contains("Can't extract file")
                         && e.getMessage().contains(", file already exists!")) {
@@ -589,6 +640,7 @@ public class Drizzle implements Tool {
                     this.logProxy.cliErrorln();
                     this.logProxy.cliErrorln(e);
                     this.logProxy.uiError(e.getMessage());
+                    this.applyProblems.add("Installing platform " + platformToInstall.getName() + " failed: " + e.getMessage());
                 }
             }
         }
@@ -648,6 +700,7 @@ public class Drizzle implements Tool {
         List<ContributedLibrary> availableLibraries = loadAvailableLibraries();
         if (availableLibraries.isEmpty()) {
             this.logProxy.cliErrorln("No available libraries were found!");
+            this.applyProblems.add("The library index is empty; @DependsOn libraries can't be installed");
             return -1;
         }
 
@@ -702,6 +755,7 @@ public class Drizzle implements Tool {
             } else {
                 if (BaseNoGui.librariesIndexer.getInstalledLibraries().getByName(libName) == null) {
                     this.logProxy.cliError("Failed to pick version for %s, expression %s%n", libName, libVer);
+                    this.applyProblems.add(String.format("No version of library %s matches %s", libName, libVer));
                 } else {
                     this.logProxy.cliInfo("Picked core library %s%n", libName);
                 }
@@ -746,6 +800,7 @@ public class Drizzle implements Tool {
                 String error = "Cannot determine the target board / platform / architecture!\nThis may indicate a missing or corrupted board package.";
                 this.logProxy.cliErrorln(error);
                 this.logProxy.uiError(error);
+                this.applyProblems.add(error.replace('\n', ' '));
                 return -1;
             }
 
@@ -769,6 +824,7 @@ public class Drizzle implements Tool {
         } catch (Exception e) {
             this.logProxy.cliErrorln(e);
             this.logProxy.uiError(e.getMessage());
+            this.applyProblems.add("Installing libraries failed: " + e);
             return -2;
         }
         this.logProxy.cliInfoln(" done:");
@@ -782,6 +838,8 @@ public class Drizzle implements Tool {
                     this.introducingTransitiveDependencyLibsToString(transitiveDependencyRequiredBy, transDep))
             );
             this.logProxy.uiWarn("Please add the missing transitive dependencies to your %s list.", MENUS_HOLDER_TITLE);
+            this.applyProblems.add("Libraries needed by other libraries aren't installed: " + missingNotInstalledTransitiveDependencies.stream()
+                    .map(ContributedLibrary::getName).collect(Collectors.joining(", ")) + "; add them as " + SourceExtractor.DEPENDSON_MARKER);
         }
         if (!missingTransitiveDependencies.isEmpty()) {
             this.logProxy.cliError("The following transitive dependencies are not listed in your project:%n");
@@ -820,6 +878,7 @@ public class Drizzle implements Tool {
             return false;
         } catch (Exception e) {
             this.logProxy.cliError("Failed extracting URL from %s%n", libUri);
+            this.applyProblems.add("Invalid library URL " + libUri);
             return false;
         }
 
@@ -828,6 +887,7 @@ public class Drizzle implements Tool {
             boolean isZip = uri.getPath().toLowerCase().endsWith(".zip");
             if (!isZip && !uri.getPath().toLowerCase().endsWith(".git")) {
                 this.logProxy.cliError("The external URL library must be a concrete ZIP file or GIT repository - '%s'! Skipping it!%n", libUri);
+                this.applyProblems.add("Library URL " + libUri + " is neither a .zip file nor a .git repository");
                 return true;
             }
 
@@ -843,8 +903,12 @@ public class Drizzle implements Tool {
                         installer.logSuccessfullyInstalledLib(libUri);
                         BaseNoGui.librariesIndexer.rescanLibraries();
                         logURILibNotInstalledOrUnlistedTransitiveDependencies(repoLibDir.resultingLibNameDir, installer, allRequiredLibNames);
+                    } else {
+                        this.applyProblems.add("Couldn't install library " + libName + " from " + libUri);
                     }
                     fileUtils.delayedDirRemoval(30000, repoLibDir.dir.getParentFile());
+                } else {
+                    this.applyProblems.add("Couldn't download library " + libName + " from " + libUri);
                 }
             } else {
                 File tempFile = fileUtils.downloadZip(url, "-lib");
@@ -854,8 +918,12 @@ public class Drizzle implements Tool {
                         installer.logSuccessfullyInstalledLib(libUri);
                         BaseNoGui.librariesIndexer.rescanLibraries();
                         logURILibNotInstalledOrUnlistedTransitiveDependencies(libName, installer, allRequiredLibNames);
+                    } else {
+                        this.applyProblems.add("Couldn't install library " + libName + " from " + libUri);
                     }
                     fileUtils.delayedFileRemoval(30000, tempFile);
+                } else {
+                    this.applyProblems.add("Couldn't download library " + libName + " from " + libUri);
                 }
             }
 
@@ -870,6 +938,8 @@ public class Drizzle implements Tool {
             installer.logSuccessfullyInstalledLib(libUri);
             BaseNoGui.librariesIndexer.rescanLibraries();
             logURILibNotInstalledOrUnlistedTransitiveDependencies(libName, installer, allRequiredLibNames);
+        } else {
+            this.applyProblems.add("Couldn't install library " + libName + " from " + libUri);
         }
 
         return true;
@@ -886,6 +956,7 @@ public class Drizzle implements Tool {
             String error = "Cannot determine the target board / platform / architecture!\nThis may indicate a missing or corrupted board package.";
             this.logProxy.cliErrorln(error);
             this.logProxy.uiError(error);
+            this.applyProblems.add(error.replace('\n', ' '));
             return;
         }
 
@@ -902,6 +973,8 @@ public class Drizzle implements Tool {
             this.logProxy.cliError("%s depends transitively on the following not installed libraries:%n", libName);
             notInstalledTransitiveDependencies.forEach(td -> this.logProxy.cliErrorln(" - " + td));
             this.logProxy.uiWarn("Please add the missing transitive dependencies to your Drizzle list.");
+            this.applyProblems.add("Libraries needed by " + libName + " aren't installed: " + String.join(", ", notInstalledTransitiveDependencies)
+                    + "; add them as " + SourceExtractor.DEPENDSON_MARKER);
         }
 
         Set<String> unlistedTransitiveDependencies = installer.getTransitiveDependencies().stream()
@@ -992,7 +1065,21 @@ public class Drizzle implements Tool {
                 + "\n *", DrizzleCLI.version(), Instant.now().toString(), MENUS_HOLDER_TITLE, MENU_APPLY_MARKERS_TITLE, UpdateUtils.webUrl());
     }
 
-    private List<String> autogenDependencyMarkers(final ActionEvent e, MutableBoolean hadCompilationIssuesFlag) {
+    /**
+     * @param includeDependencies also compile the sketch to find the libraries it uses (long-running)
+     */
+    private List<String> generateMarkers(final boolean includeDependencies, final MutableBoolean hadCompilationIssues) {
+        List<String> dependencyMarkers = includeDependencies ? autogenDependencyMarkers(hadCompilationIssues) : Collections.emptyList();
+        List<String> markers = autogenBoardAndBoardSettingsMarkers();
+
+        if (includeDependencies) {
+            markers.add("");
+            markers.addAll(dependencyMarkers);
+        }
+        return markers;
+    }
+
+    private List<String> autogenDependencyMarkers(MutableBoolean hadCompilationIssuesFlag) {
         final Map<String, String> libs = new LinkedHashMap<>();
         Pattern libsPattern = Pattern.compile(".*-> candidates: \\[([^\\]]+)\\].*");
 
@@ -1043,7 +1130,7 @@ public class Drizzle implements Tool {
                 .collect(Collectors.toList());
     }
 
-    private List<String> autogenBoardAndBoardSettingsMarkers(final ActionEvent e) {
+    private List<String> autogenBoardAndBoardSettingsMarkers() {
         // a semi-naive implementation that should do the job for now
 
         List<String> result = new ArrayList<>();
@@ -1120,17 +1207,20 @@ public class Drizzle implements Tool {
         return currentTab;
     }
 
+    private String makeCommentBlockWithMarkers(List<String> commentLines) {
+        String comment = TextUtils.concatenate(TextUtils::isNotNullOrBlank, s -> String.format("\n * %s", s),
+                commentLines.toArray(new String[commentLines.size()]));
+
+        return makeAutogenHeadingText() + comment + "\n */";
+    }
+
     private void insertCommentBlockWithMarkersAtStartOfTheCurrentTab(List<String> commentLines) {
         if (!commentLines.isEmpty()) {
             EditorTab currentTab = getPrimarySketchTabIfOpened();
             if (currentTab == null) return;
 
-            String comment = TextUtils.concatenate(TextUtils::isNotNullOrBlank, s -> String.format("\n * %s", s),
-                    commentLines.toArray(new String[commentLines.size()]));
-
-            StringBuilder sb = new StringBuilder(makeAutogenHeadingText())
-                    .append(comment)
-                    .append("\n */\n\n")
+            StringBuilder sb = new StringBuilder(makeCommentBlockWithMarkers(commentLines))
+                    .append("\n\n")
                     .append(currentTab.getText());
 
             currentTab.setScrollPosition(0);
@@ -1139,5 +1229,233 @@ public class Drizzle implements Tool {
 
             this.logProxy.uiInfo("Markers auto-generation is done. Don't forget to save the changes.");
         }
+    }
+
+    public static List<String> availableFqbns() {
+        return BaseNoGui.packages.values().stream()
+                .flatMap(targetPackage -> targetPackage.platforms().stream())
+                .flatMap(targetPlatform -> targetPlatform.getBoards().values().stream())
+                .map(TargetBoard::getFQBN)
+                .distinct()
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    private void installArduinoTools() {
+        logProxy.uiInfo("                                                                                                                                                                                                               ");
+        String source;
+        try {
+            source = SourceExtractor.loadSourceFromPrimarySketch(editor);
+        } catch (IOException ex) {
+            logProxy.cliErrorln(ex);
+            logProxy.uiError(ex.getMessage());
+            return;
+        }
+
+        SourceExtractor se = new SourceExtractor(editor, logProxy);
+        List<SourceExtractor.ArduinoTool> arduinoTools = se.arduinoToolsFromMainSketchSource(source);
+
+        ArduinoIDEToolsInstaller toolsInstaller = new ArduinoIDEToolsInstaller(logProxy);
+
+        int installedToolsCount = 0;
+        for (SourceExtractor.ArduinoTool at : arduinoTools) {
+            String installedVer = toolsInstaller.extractInstalledToolVersion(at.name);
+            if (installedVer == null || (!installedVer.isEmpty() && SemVer.satisfies(installedVer, at.version))) {
+                logProxy.cliInfo("Installing %s from %s...%n", at.name, at.url);
+                if (toolsInstaller.installTool(at.name, at.url)) {
+                    ++installedToolsCount;
+                    logProxy.cliInfo("Successfully installed %s!%n", at.name);
+                } else {
+                    logProxy.cliError("Failed installing %s!%n", at.name);
+                }
+            } else {
+                logProxy.cliInfo("Skipped the installation of %s.%n", at.name);
+            }
+        }
+
+        if (installedToolsCount > 0) {
+            logProxy.uiInfo("You'll have to restart Arduino IDE in for the new tools to get loaded.");
+            logProxy.cliInfoln("Please restart the IDE in order to load the newly installed tools.");
+        }
+
+        logProxy.cliInfoln("Finished installing Arduino IDE tools.");
+    }
+
+    /**
+     * @return the lease, or null (after telling the user) while a remote command runs
+     */
+    private ActivityGuard.Lease tryLocalActivity(String description) {
+        ActivityGuard.Lease lease = ActivityGuard.tryLocal(description);
+        if (lease == null) {
+            logProxy.uiError("Drizzle is busy with %s. Try again when it finishes, or cancel it via Tools > %s > %s.",
+                    Objects.toString(ActivityGuard.busyDescription(), "another command"), MENUS_HOLDER_TITLE,
+                    MENU_CANCEL_REMOTE_COMMAND_TITLE);
+        }
+        return lease;
+    }
+
+    private static boolean isRemoteControlSupported() {
+        return Objects.equals(UpdateUtils.arduinoRevision(), REMOTE_CONTROL_ARDUINO_REVISION);
+    }
+
+    private void enableRemoteControl() {
+        if (!isRemoteControlSupported()) return;
+
+        Function<Map<String, Object>, Map<String, Object>> endpoint = this::handleRemoteRequest;
+        this.editor.getRootPane().putClientProperty(IDERemoteCommandHandler.ENDPOINT_PROPERTY, endpoint);
+        RemoteControl.ensureStarted(this.logProxy);
+    }
+
+    /**
+     * Carries out a remote command about this window's sketch; see {@link IDERemoteCommandHandler#ENDPOINT_PROPERTY}.
+     * Runs on the remote job thread.
+     */
+    private Map<String, Object> handleRemoteRequest(final Map<String, Object> request) {
+        String command = String.valueOf(request.get("command"));
+        Map<?, ?> args = request.get("args") instanceof Map ? (Map<?, ?>) request.get("args") : Collections.emptyMap();
+
+        try {
+            syncEditorWithDisk();
+
+            switch (command) {
+                case RemoteProtocol.CMD_APPLY_MARKERS:
+                    SwingUtilities.invokeAndWait(this::prepareConsoleForApplyingMarkers);
+                    return applyMarkers();
+                case RemoteProtocol.CMD_COMPILE:
+                    return compileForRemote("true".equals(args.get(RemoteProtocol.ARG_VERBOSE)));
+                case RemoteProtocol.CMD_AUTOGEN_MARKERS:
+                    return generateMarkersForRemote(!"board".equals(args.get(RemoteProtocol.ARG_MODE)));
+                default:
+                    return remoteFailure(RemoteProtocol.ERR_BAD_REQUEST, "Unsupported command: " + command);
+            }
+        } catch (RemoteException e) {
+            return remoteFailure(e.getCode(), e.getMessage());
+        } catch (Exception e) {
+            this.logProxy.cliErrorln(e);
+            return remoteFailure(RemoteProtocol.ERR_INTERNAL, e.toString());
+        }
+    }
+
+    private static Map<String, Object> remoteFailure(final String code, final String message) {
+        Map<String, Object> failure = new LinkedHashMap<>();
+        failure.put("code", code);
+        failure.put("message", message);
+        return Collections.singletonMap("failure", failure);
+    }
+
+    /**
+     * Remote callers edit the sketch's files on disk. Refuses to work over unsaved changes made in the IDE, and
+     * reloads the tabs whose files changed, so the IDE shows what gets compiled.
+     */
+    private void syncEditorWithDisk() throws RemoteException, InvocationTargetException, InterruptedException {
+        List<String> unsavedFiles = new ArrayList<>();
+
+        SwingUtilities.invokeAndWait(() -> {
+            for (SketchFile file : this.editor.getSketch().getFiles()) {
+                if (file.isModified()) unsavedFiles.add(file.getFileName());
+            }
+            if (!unsavedFiles.isEmpty()) return;
+
+            // picks up files added or deleted on disk, like the IDE does for external editors when it gets the focus
+            try {
+                if (this.editor.getSketch().reload()) {
+                    this.editor.createTabs();
+                    return;
+                }
+            } catch (IOException | RuntimeException e) {
+                // the sketch folder can't be listed - the command itself will report it
+            }
+
+            for (EditorTab tab : this.editor.getTabs()) {
+                try {
+                    if (!tab.getText().equals(tab.getSketchFile().load())) {
+                        tab.reload();
+                    }
+                } catch (IOException e) {
+                    // deleted or unreadable - the command itself will report it
+                }
+            }
+        });
+
+        if (!unsavedFiles.isEmpty()) {
+            throw new RemoteException(RemoteProtocol.ERR_UNSAVED_CHANGES, "The sketch has unsaved changes in Arduino IDE ("
+                    + String.join(", ", unsavedFiles) + "). Save or revert them in the IDE first.");
+        }
+    }
+
+    /**
+     * Compiles like the Verify button does, through the sketch controller and thus with the {@code @Preferences} hook.
+     */
+    private Map<String, Object> compileForRemote(final boolean verbose) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        Optional<EditorStatus> editorStatus = this.uiLocator.editorStatus();
+        Runnable reportInUI = () -> { };
+
+        SwingUtilities.invokeLater(() -> {
+            this.editor.removeAllLineHighlights();
+            editorStatus.ifPresent(es -> es.progress("Compiling sketch (requested remotely)..."));
+        });
+
+        // the compiler takes its verbosity from this preference; SketchController.build() ignores its verbose argument
+        String previousVerbose = PreferencesData.get(BUILD_VERBOSE_PREFERENCE);
+        PreferencesData.setBoolean(BUILD_VERBOSE_PREFERENCE, verbose);
+        try {
+            if (this.editor.getSketchController().build(verbose, false) != null) {
+                result.put("ok", true);
+                reportInUI = () -> this.editor.statusNotice("Done compiling.");
+            } else {
+                // the @Preferences hook refused to build; it logged why
+                result.put("ok", false);
+                result.put("error", Collections.singletonMap("message", "The build didn't run; the log tells why"));
+                reportInUI = () -> this.editor.statusError("The build didn't run; see the console");
+            }
+        } catch (RunnerException e) {
+            Map<String, Object> error = new LinkedHashMap<>();
+            error.put("message", e.getMessage() != null ? e.getMessage() : String.valueOf(e.getCause()));
+            if (e.hasCodeFile()) {
+                // without a file the line is meaningless: RunnerException(Exception) leaves it at 0
+                error.put("file", e.getCodeFile().getFile().getAbsolutePath());
+                if (e.hasCodeLine()) error.put("line", e.getCodeLine() + 1); // RunnerException counts lines from 0
+                if (e.hasCodeLine() && e.getCodeColumn() > 0) error.put("column", e.getCodeColumn());
+            }
+
+            result.put("ok", false);
+            result.put("error", error);
+            reportInUI = () -> this.editor.statusError(e);
+        } catch (PreferencesMapException | IOException e) {
+            result.put("ok", false);
+            result.put("error", Collections.singletonMap("message", String.valueOf(e.getMessage())));
+            reportInUI = () -> this.editor.statusError(e);
+        } finally {
+            if (previousVerbose == null) {
+                PreferencesData.remove(BUILD_VERBOSE_PREFERENCE);
+            } else {
+                PreferencesData.set(BUILD_VERBOSE_PREFERENCE, previousVerbose);
+            }
+
+            Runnable report = reportInUI;
+            SwingUtilities.invokeLater(() -> {
+                editorStatus.ifPresent(EditorStatus::unprogress);
+                report.run();
+            });
+        }
+
+        return result;
+    }
+
+    private Map<String, Object> generateMarkersForRemote(final boolean includeDependencies) {
+        MutableBoolean hadCompilationIssues = new MutableBoolean();
+        List<String> markers = generateMarkers(includeDependencies, hadCompilationIssues).stream()
+                .filter(TextUtils::isNotNullOrBlank)
+                .collect(Collectors.toList());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ok", !hadCompilationIssues.get());
+        result.put("markers", markers);
+        result.put("comment", makeCommentBlockWithMarkers(markers));
+        if (hadCompilationIssues.get()) {
+            result.put("warning", "The compilation failed, so the @DependsOn markers may be incomplete");
+        }
+        return result;
     }
 }

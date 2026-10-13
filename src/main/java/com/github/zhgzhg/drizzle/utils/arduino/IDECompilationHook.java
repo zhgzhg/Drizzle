@@ -1,5 +1,6 @@
 package com.github.zhgzhg.drizzle.utils.arduino;
 
+import com.github.zhgzhg.drizzle.remote.ActivityGuard;
 import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import processing.app.Editor;
 import processing.app.EditorConsole;
@@ -36,22 +37,44 @@ public class IDECompilationHook {
             this.afterHook = afterHook;
         }
 
+        /**
+         * Upload: covers the whole of it, the flashing after the build included.
+         */
+        @Override
+        protected boolean exportApplet(final boolean usingProgrammer) throws Exception {
+            try (ActivityGuard.Lease lease = ActivityGuard.tryLocal("Upload")) {
+                if (lease == null) throw busy();
+                return super.exportApplet(usingProgrammer);
+            }
+        }
+
         @Override
         public String build(final boolean verbose, final boolean save) throws RunnerException, PreferencesMapException, IOException {
-            Map<String, Object> ctx = new ConcurrentHashMap<>();
-            String result = null;
-            if (beforeHook == null || beforeHook.run(this.editor, this.logProxy, ctx)) {
-                try {
-                    result = super.build(verbose, save);
-                } finally {
-                    if (afterHook != null) {
-                        afterHook.run(this.editor, this.logProxy, ctx);
-                    }
-                    ctx.clear();
-                }
-            }
+            try (ActivityGuard.Lease lease = ActivityGuard.tryLocal("Verify/Upload")) {
+                if (lease == null) throw busy();
 
-            return result;
+                Map<String, Object> ctx = new ConcurrentHashMap<>();
+                String result = null;
+                if (beforeHook == null || beforeHook.run(this.editor, this.logProxy, ctx)) {
+                    try {
+                        result = super.build(verbose, save);
+                    } finally {
+                        if (afterHook != null) {
+                            afterHook.run(this.editor, this.logProxy, ctx);
+                        }
+                        ctx.clear();
+                    }
+                }
+
+                return result;
+            }
+        }
+
+        private static RunnerException busy() {
+            RunnerException e = new RunnerException("Drizzle is busy with " + ActivityGuard.busyDescription()
+                    + ". Try again when it finishes, or cancel it via Tools > Drizzle > Cancel Remote Command.");
+            e.hideStackTrace(); // shown in the status bar; a stack trace in the console would only alarm
+            return e;
         }
     }
 
