@@ -4,6 +4,7 @@ import com.github.zhgzhg.drizzle.utils.source.SourceExtractor;
 import com.google.gson.JsonDeserializationContext;
 import com.google.gson.JsonDeserializer;
 import com.google.gson.JsonElement;
+import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import com.google.gson.JsonSerializationContext;
@@ -28,12 +29,13 @@ public class BoardSettingsSerializerCustomizer implements JsonSerializer<SourceE
 
         JsonObject board = context.serialize(src.board, SourceExtractor.Board.class).getAsJsonObject();
 
-        JsonPrimitive platform = board.getAsJsonPrimitive(PLATFORM);
-        if (platform == null || platform.getAsString().isEmpty()) {
+        // a "*" (any) platform or board is kept as null, which serializes to JsonNull when nulls are serialized
+        JsonElement platform = board.get(PLATFORM);
+        if (platform == null || platform instanceof JsonNull || platform.getAsString().isEmpty()) {
             board.add(PLATFORM, new JsonPrimitive("*"));
         }
-        JsonPrimitive boardName = board.getAsJsonPrimitive(NAME);
-        if (boardName == null || boardName.getAsString().isEmpty()) {
+        JsonElement boardName = board.get(NAME);
+        if (boardName == null || boardName instanceof JsonNull || boardName.getAsString().isEmpty()) {
             board.add(NAME, new JsonPrimitive("*"));
         }
         board.remove(PROVIDER_PACKAGE);

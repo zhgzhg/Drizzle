@@ -28,6 +28,7 @@ public class DrizzleCLI {
 
             System.out.printf("Usage:%n");
             System.out.printf("\tjava -jar drizzle-%s.jar --parse <arduino-proj.ino | arduino-proj-directory>%n", implementationVersion);
+            System.out.printf("\t\t(for a directory containing drizzle.json, prints that file's settings instead of the markers)%n");
             System.out.printf("\tjava -jar drizzle-%s.jar --rev-parse <file.json>%n", implementationVersion);
 
             System.out.printf("%n\tControls a running Arduino IDE %s with Drizzle (prints JSON):%n%n", "1.8.19");
@@ -76,6 +77,12 @@ public class DrizzleCLI {
     public static void parseSketchMarkers(String file) {
         File sketch = new File(file);
         if (sketch.exists() && sketch.isDirectory()) {
+            // like Arduino IDE: a drizzle.json in the sketch folder replaces the main sketch file's markers
+            File drizzleJson = new File(sketch, "drizzle.json");
+            if (drizzleJson.isFile()) {
+                printDrizzleJson(drizzleJson);
+                return;
+            }
             sketch = new File(sketch.getPath(), sketch.getName().concat(".ino"));
         }
 
@@ -108,6 +115,27 @@ public class DrizzleCLI {
 
         ProjectSettings projectSettings = ProjectSettings.fromSource(sourceExtractor, source);
         System.out.println(ProjectSettings.toJSON(projectSettings));
+    }
+
+    /**
+     * Prints a drizzle.json in the same form as parsed markers. Unlike Arduino IDE, which falls back to the markers
+     * when it can't read the file, this fails, so a broken file doesn't go unnoticed.
+     */
+    private static void printDrizzleJson(File drizzleJson) {
+        try {
+            String json = new String(Files.readAllBytes(drizzleJson.toPath()));
+
+            ProjectSettings projectSettings = ProjectSettings.fromJSON(json, new LogProxy()); // prints why it fails
+            if (projectSettings == null) {
+                System.err.printf("Cannot read %s%n", drizzleJson);
+                System.exit(-5);
+            }
+
+            System.out.println(ProjectSettings.toJSON(projectSettings));
+        } catch (IOException e) {
+            e.printStackTrace(System.err);
+            System.exit(-4);
+        }
     }
 
     public static String version() {

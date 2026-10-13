@@ -31,6 +31,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -169,24 +170,32 @@ public class SourceExtractor {
             this.preferences = new LinkedHashMap<>();
         }
 
+        /**
+         * Every part of the marker's board selector must be "*" (kept as null) or equal to the selected board's.
+         */
         public boolean suitsRequirements(String providerPackage, String platformName, String boardName) {
+            if (TextUtils.allNullOrBlank(providerPackage, platformName, boardName)) return true;
 
-            boolean matching = TextUtils.allNullOrBlank(providerPackage, platformName, boardName);
+            return (board.providerPackage == null || board.providerPackage.equals(providerPackage))
+                    && (board.platform == null || board.platform.equals(platformName))
+                    && (board.name == null || board.name.equals(boardName));
+        }
 
-            if (!matching) {
-                if (TextUtils.allNotBlank(board.providerPackage, board.platform, board.name)) {
-                    matching = board.providerPackage.equals(providerPackage) && board.platform.equals(platformName)
-                            && board.name.equals(boardName);
-                } else if (TextUtils.allNotBlank(board.platform, board.name)) {
-                    matching = board.platform.equals(platformName) && board.name.equals(boardName);
-                } else if (TextUtils.isNotNullOrBlank(board.platform)) {
-                    matching = board.platform.equals(platformName);
-                } else if (TextUtils.isNotNullOrBlank(board.name)) {
-                    matching = board.name.equals(boardName);
+        /**
+         * Merges the preferences of the markers matching the selected board, by board ID or name. The first marker
+         * defining a preference wins, so markers are expected from the most to the least specific.
+         */
+        public static Map<String, String> applicable(List<Preferences> markers, String providerPackage, String platformName,
+                String boardId, String boardName) {
+
+            Map<String, String> result = new LinkedHashMap<>();
+            for (Preferences pref : markers) {
+                if (pref.suitsRequirements(providerPackage, platformName, boardId)
+                        || pref.suitsRequirements(providerPackage, platformName, boardName)) {
+                    pref.preferences.forEach(result::putIfAbsent);
                 }
             }
-
-            return matching;
+            return result;
         }
 
         @Override
@@ -336,19 +345,20 @@ public class SourceExtractor {
         }
 
         try {
-            Map<String, Map<String, String>> boardAndClickableSettings = extractMarkersKeyAndParams(
-                    extractAllCommentsFromSource(source), BOARD_SETTINGS, BOARDSETTINGS_MARKER, PLATFORM_GROUP,
-                    Arrays.asList(BOARD_GROUP, MENU_GROUP)
+            List<Map<String, String>> boardsAndClickableSettings = extractEveryMarker(
+                    extractAllCommentsFromSource(source), BOARD_SETTINGS, BOARDSETTINGS_MARKER,
+                    Arrays.asList(PLATFORM_GROUP, BOARD_GROUP, MENU_GROUP)
             );
 
-            List<BoardSettings> result = new ArrayList<>(boardAndClickableSettings.size());
-            boardAndClickableSettings.forEach((platformName, boardStuff) -> {
+            List<BoardSettings> result = new ArrayList<>(boardsAndClickableSettings.size());
+            boardsAndClickableSettings.forEach(boardStuff -> {
+                String platformName = boardStuff.get(PLATFORM_GROUP);
                 String boardName = boardStuff.get(BOARD_GROUP);
                 Board board = new Board(null, !platformName.equals("*") ? platformName : null, !"*".equals(boardName) ? boardName : null);
                 BoardSettings boardSettings = new BoardSettings(board);
 
                 String menus = boardStuff.get(MENU_GROUP);
-                if (menus == null && menus.isEmpty()) return;
+                if (menus == null || menus.isEmpty()) return;
 
                 List<String> menusToClick = Arrays.stream(menus.split("\\|\\|")).collect(Collectors.toCollection(ArrayList::new));
                 int lastItemIdx = menusToClick.size() - 1;
@@ -381,20 +391,21 @@ public class SourceExtractor {
         }
 
         try {
-            Map<String, Map<String, String>> boardAndPreferences = extractMarkersKeyAndParams(
-                    extractAllCommentsFromSource(source), PREFERENCES, PREFERENCES_MARKER, PACKAGE_PROVIDER_GROUP,
-                    Arrays.asList(PLATFORM_GROUP, BOARD_GROUP, PREFDEF_GROUP)
+            List<Map<String, String>> boardsAndPreferences = extractEveryMarker(
+                    extractAllCommentsFromSource(source), PREFERENCES, PREFERENCES_MARKER,
+                    Arrays.asList(PACKAGE_PROVIDER_GROUP, PLATFORM_GROUP, BOARD_GROUP, PREFDEF_GROUP)
             );
 
-            List<Preferences> result = new ArrayList<>(boardAndPreferences.size());
-            boardAndPreferences.forEach((providerPackageName, boardStuff) -> {
+            List<Preferences> result = new ArrayList<>(boardsAndPreferences.size());
+            boardsAndPreferences.forEach(boardStuff -> {
+                String providerPackageName = boardStuff.get(PACKAGE_PROVIDER_GROUP);
                 String platformName = boardStuff.get(PLATFORM_GROUP);
                 String boardName = boardStuff.get(BOARD_GROUP);
 
                 Preferences preferences = new Preferences(new Board(providerPackageName, platformName, boardName));
 
                 String preferenceDefs = boardStuff.get(PREFDEF_GROUP);
-                if (preferenceDefs == null && preferenceDefs.isEmpty()) return;
+                if (preferenceDefs == null || preferenceDefs.isEmpty()) return;
 
                 List<String> prefDefPairs = Arrays.stream(preferenceDefs.split("\\|\\|")).collect(Collectors.toCollection(ArrayList::new));
                 int lastItemIdx = prefDefPairs.size() - 1;
@@ -525,6 +536,22 @@ public class SourceExtractor {
 
     private Map<String, Map<String, String>> extractMarkersKeyAndParams(List<String> comments, Pattern marker, String markerName,
             String keyGroup, List<String> paramGroups, Function<Map<String, String>, String> onNullKey) {
+        return extractMarkers(comments, marker, markerName, matcher -> matcher.group(keyGroup), paramGroups, onNullKey);
+    }
+
+    /**
+     * Collects every marker in the order of definition, for markers that may repeat: when several of them set the same
+     * thing, the first one wins later on.
+     */
+    private List<Map<String, String>> extractEveryMarker(List<String> comments, Pattern marker, String markerName,
+            List<String> paramGroups) {
+        AtomicInteger position = new AtomicInteger();
+        return new ArrayList<>(extractMarkers(comments, marker, markerName,
+                matcher -> Integer.toString(position.getAndIncrement()), paramGroups, data -> null).values());
+    }
+
+    private Map<String, Map<String, String>> extractMarkers(List<String> comments, Pattern marker, String markerName,
+            Function<Matcher, String> keyOf, List<String> paramGroups, Function<Map<String, String>, String> onNullKey) {
 
         if (comments == null || comments.isEmpty()) return Collections.emptyMap();
 
@@ -535,7 +562,7 @@ public class SourceExtractor {
                         (result, comment) -> {
                             Matcher matcher = marker.matcher(comment);
                             if (matcher.matches()) {
-                                String key = matcher.group(keyGroup);
+                                String key = keyOf.apply(matcher);
                                 Map<String, String> params = new LinkedHashMap<>();
                                 if (paramGroups != null) {
                                     paramGroups.forEach(pg -> params.put(pg, matcher.group(pg)));

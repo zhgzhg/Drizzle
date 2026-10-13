@@ -162,19 +162,13 @@ public class Drizzle implements Tool {
                     }
 
                     SourceExtractor se = new SourceExtractor(_editor, _logProxy);
-                    for (SourceExtractor.Preferences pref : se.dependentPreferencesFromMainSketchSource(source)) {
-                        if (pref.suitsRequirements(targetPackageName, targetPlatformName, targetBoardId)
-                                || pref.suitsRequirements(targetPackageName, targetPlatformName, targetBoardName)) {
-
-                            pref.preferences.entrySet().stream()
-                                    .forEach(ent -> {
-                                        String k = String.format("runtime.build_properties_custom.%s", ent.getKey());
-                                        String v = ent.getValue();
-                                        PreferencesData.set(k, v);
-                                        _context.put(k, v);
-                                    });
-                        }
-                    }
+                    SourceExtractor.Preferences.applicable(se.dependentPreferencesFromMainSketchSource(source),
+                            targetPackageName, targetPlatformName, targetBoardId, targetBoardName)
+                            .forEach((key, v) -> {
+                                String k = String.format("runtime.build_properties_custom.%s", key);
+                                PreferencesData.set(k, v);
+                                _context.put(k, v);
+                            });
 
                     return true;
                 },
@@ -361,6 +355,7 @@ public class Drizzle implements Tool {
         if (lease == null) return;
 
         prepareConsoleForApplyingMarkers();
+        warnAboutUnsavedChanges();
         new Thread(() -> {
             try {
                 applyMarkers();
@@ -1014,6 +1009,8 @@ public class Drizzle implements Tool {
                         .collect(Collectors.toList());
 
         int clickedItems = 0;
+        // the first marker setting a menu wins, so markers are expected from the most to the least specific
+        Set<List<String>> decidedMenus = new HashSet<>();
 
         List<JMenu> jMenus = this.uiLocator.customMenusForCurrentlySelectedBoard();
 
@@ -1022,6 +1019,8 @@ public class Drizzle implements Tool {
 
                 List<String> parents = (menuPath.size() > 1 ? menuPath.subList(0, menuPath.size() - 1) : Collections.emptyList());
                 String menuItem = (!parents.isEmpty() ? menuPath.get(menuPath.size() - 1) : menuPath.get(0));
+                List<String> menu = (!parents.isEmpty() ? parents : menuPath);
+                if (decidedMenus.contains(menu)) continue;
 
                 JMenuItem me = this.uiLocator.walkTowardsMenuItem(jMenus, parents, (targetMenuName, currMenu) -> {
                        if (!currMenu.isEnabled() && !currMenu.isVisible()) {
@@ -1051,6 +1050,7 @@ public class Drizzle implements Tool {
                     System.out.printf("Clicking on %s->%s%n", String.join("->", parents), me.getText());
                     me.doClick();
                     ++clickedItems;
+                    decidedMenus.add(menu);
                 }
             }
         }
@@ -1171,21 +1171,24 @@ public class Drizzle implements Tool {
             );
             result.add(boardSettings);
         } else {
-            this.logProxy.cliWarn("No suitable clickable menus found for %s marker%n", SourceExtractor.BOARD_SETTINGS);
+            this.logProxy.cliWarn("No suitable clickable menus found for %s marker%n", SourceExtractor.BOARDSETTINGS_MARKER);
         }
 
         String boardManager = "";
         if (TextUtils.isNotNullOrBlank(platformName)) {
             Map<String, ContributedPlatform> possiblePlatforms = BaseNoGui.indexer.getPackages().stream()
+                    .filter(pkg -> TextUtils.isNullOrBlank(providerPackageName) || providerPackageName.equals(pkg.getName()))
                     .map(ContributedPackage::getPlatforms)
                     .flatMap(List::stream)
                     .filter(cp -> !cp.isBuiltIn() && cp.isInstalled() && platformName.equals(cp.getArchitecture())
                             && TextUtils.isNotNullOrBlank(cp.getUrl()))
-                    .collect(Collectors.toMap(ContributedPlatform::getVersion, Function.identity()));
+                    .collect(Collectors.toMap(ContributedPlatform::getVersion, Function.identity(), (first, second) -> first));
 
-            if (!possiblePlatforms.isEmpty()) {
-                String s = SemVer.maxSatisfying(possiblePlatforms.keySet(), "*");
-                boardManager = String.format("%s %s::%s", SourceExtractor.BOARDMANAGER_MARKER, platformName, s);
+            String version = SemVer.maxSatisfying(possiblePlatforms.keySet(), "*");
+            ContributedPlatform platform = (version != null ? possiblePlatforms.get(version) : null);
+            if (platform != null) {
+                // @BoardManager finds platforms by the name the Boards Manager lists, not by their architecture
+                boardManager = String.format("%s %s::%s", SourceExtractor.BOARDMANAGER_MARKER, platform.getName(), version);
                 result.add(boardManager);
             }
         }
@@ -1243,6 +1246,7 @@ public class Drizzle implements Tool {
 
     private void installArduinoTools() {
         logProxy.uiInfo("                                                                                                                                                                                                               ");
+        warnAboutUnsavedChanges();
         String source;
         try {
             source = SourceExtractor.loadSourceFromPrimarySketch(editor);
@@ -1279,6 +1283,17 @@ public class Drizzle implements Tool {
         }
 
         logProxy.cliInfoln("Finished installing Arduino IDE tools.");
+    }
+
+    /**
+     * Drizzle reads the saved sketch files, so changes still in the editor, e.g. auto-generated markers, are missed.
+     */
+    private void warnAboutUnsavedChanges() {
+        if (this.editor.getSketch().isModified()) {
+            String warning = "The sketch has unsaved changes, but Drizzle reads the saved files. Save the sketch to use what the editor shows.";
+            this.logProxy.cliWarnln(warning);
+            this.logProxy.uiWarn(warning);
+        }
     }
 
     /**

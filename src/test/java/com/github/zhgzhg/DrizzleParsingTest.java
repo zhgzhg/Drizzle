@@ -18,12 +18,16 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.lang.reflect.Type;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 class DrizzleParsingTest {
@@ -114,6 +118,59 @@ class DrizzleParsingTest {
 
         assertEquals(loadWholeTextResource("sample_sketch_parsed.json"), gson.toJson(projectSettings));
         assertEquals(loadWholeTextResource("sample_sketch_parsed2.json"), gson.toJson(projectSettings2));
+    }
+
+    @Test
+    void wildcardBoardSettingsTurnIntoJson() {
+        String source = "/*\n * @BoardSettings *::*::Upload Speed->115200\n */\nvoid setup() {}\nvoid loop() {}\n";
+        ProjectSettings projectSettings = createProjectSettings(new SourceExtractor(null, strictLogProxy), source);
+
+        String json = ProjectSettings.toJSON(projectSettings);
+        assertTrue(json.contains("\"platform\": \"*\""), json);
+        assertTrue(json.contains("\"name\": \"*\""), json);
+        assertTrue(json.contains("\"Upload Speed\""), json);
+    }
+
+    @Test
+    void keepsEveryBoardSettingsAndPreferencesMarker() {
+        String source = "/*\n"
+                + " * @BoardSettings esp32::esp32wrover::Flash Frequency->80MHz\n"
+                + " * @BoardSettings esp32::*::Flash Frequency->40MHz||PSRAM->Disabled\n"
+                + " * @BoardSettings esp32::*::Upload Speed->921600\n"
+                + " * @Preferences esp32::esp32::esp32wrover::compiler.cpp.extra_flags=-DA\n"
+                + " * @Preferences esp32::esp32::*::compiler.cpp.extra_flags=-DB||compiler.c.extra_flags=-DC\n"
+                + " */\nvoid setup() {}\nvoid loop() {}\n";
+        SourceExtractor sourceExtractor = new SourceExtractor(null, strictLogProxy);
+
+        List<SourceExtractor.BoardSettings> boardSettings = sourceExtractor.dependentBoardClickableSettingsFromMainSketchSource(source);
+        assertEquals(3, boardSettings.size(), boardSettings.toString());
+        assertEquals("esp32wrover", boardSettings.get(0).board.name);
+        assertEquals(Arrays.asList(Arrays.asList("Flash Frequency", "40MHz"), Arrays.asList("PSRAM", "Disabled")),
+                boardSettings.get(1).clickableOptions);
+        assertEquals(Collections.singletonList(Arrays.asList("Upload Speed", "921600")), boardSettings.get(2).clickableOptions);
+
+        List<SourceExtractor.Preferences> preferences = sourceExtractor.dependentPreferencesFromMainSketchSource(source);
+        assertEquals(2, preferences.size(), preferences.toString());
+
+        Map<String, String> forWrover = SourceExtractor.Preferences.applicable(preferences, "esp32", "esp32", "esp32wrover", "ESP32 Wrover Module");
+        assertEquals("-DA", forWrover.get("compiler.cpp.extra_flags"), "the first, most specific marker wins");
+        assertEquals("-DC", forWrover.get("compiler.c.extra_flags"), "later markers fill in the rest");
+
+        Map<String, String> forDevModule = SourceExtractor.Preferences.applicable(preferences, "esp32", "esp32", "esp32", "ESP32 Dev Module");
+        assertEquals("-DB", forDevModule.get("compiler.cpp.extra_flags"));
+    }
+
+    @Test
+    void wildcardPreferencesMatchEveryBoard() {
+        SourceExtractor.Preferences anyBoard = new SourceExtractor.Preferences(new SourceExtractor.Board("*", "*", "*"));
+        SourceExtractor.Preferences anyEsp32Board = new SourceExtractor.Preferences(new SourceExtractor.Board("esp32", "*", "*"));
+        SourceExtractor.Preferences anyAvrBoard = new SourceExtractor.Preferences(new SourceExtractor.Board("*", "avr", "*"));
+
+        assertTrue(anyBoard.suitsRequirements("esp32", "esp32", "esp32"));
+        assertTrue(anyEsp32Board.suitsRequirements("esp32", "esp32", "esp32"));
+        assertFalse(anyEsp32Board.suitsRequirements("arduino", "avr", "uno"));
+        assertTrue(anyAvrBoard.suitsRequirements("arduino", "avr", "uno"));
+        assertFalse(anyAvrBoard.suitsRequirements("esp32", "esp32", "esp32"));
     }
 
     @Test
