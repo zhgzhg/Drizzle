@@ -55,7 +55,7 @@ An example:
  *
  * @Preferences esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)::compiler.cpp.extra_flags=-std=gnu++14 -DTEST123
  *
- * @ArduinoTool Drizzle::(<0.16.7)::https://github.com/zhgzhg/Drizzle/releases/download/0.16.7/drizzle-0.16.7-dist.zip
+ * @ArduinoTool Drizzle::(<0.17.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.17.0/drizzle-0.17.0-dist.zip
  */
 
 // Your sample code follows below just as usual
@@ -198,7 +198,7 @@ Always define the concrete rules in the beginning, and the less concrete at the 
   * The _tool_name_ must match the name of the directory containing the actual tool. It has to be unique. In the case of several duplicating
     names the first one will be respected.
   * Examples:
-    * `@ArduinoTool Drizzle::(<0.16.7)::https://github.com/zhgzhg/Drizzle/releases/download/0.16.7/drizzle-0.16.7-dist.zip`
+    * `@ArduinoTool Drizzle::(<0.17.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.17.0/drizzle-0.17.0-dist.zip`
     * `@ArduinoTool Drizzle::*::file:///C:/Users/John/Drizzle/drizzle.zip`
     * `@ArduinoTool EspExceptionDecoder::(<=1.0.0)::https://github.com/me-no-dev/EspExceptionDecoder/releases/download/2.0.3/EspExceptionDecoder-2.0.3.zip`
 
@@ -209,7 +209,7 @@ CLI Extras
 Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
 from JSON file Drizzle markers will be produced is also supported.
 
-For e.g. `java -jar drizzle-0.16.7-with-deps.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.17.0-with-deps.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -269,14 +269,14 @@ For e.g. `java -jar drizzle-0.16.7-with-deps.jar --parse hello-world.ino` will p
   ],
   "arduino_ide_tools": {
     "Drizzle": {
-      "version": "(<0.16.7)",
-      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.16.7/drizzle-0.16.7-dist.zip"
+      "version": "(<0.17.0)",
+      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.17.0/drizzle-0.17.0-dist.zip"
     }
   }
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.16.7-with-deps.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.17.0-with-deps.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
@@ -286,7 +286,7 @@ Executing on the above JSON `java -jar drizzle-0.16.7-with-deps.jar --rev-parse 
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
 @Preferences esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)::compiler.cpp.extra_flags=-std=gnu++14 -DTEST123
-@ArduinoTool Drizzle::(<0.16.7)::https://github.com/zhgzhg/Drizzle/releases/download/0.16.7/drizzle-0.16.7-dist.zip
+@ArduinoTool Drizzle::(<0.17.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.17.0/drizzle-0.17.0-dist.zip
 ```
 
 
@@ -303,7 +303,7 @@ Assuming the execution happens inside
 #### Install Drizzle:
 
 ```
-DRIZZLE_VER="0.16.7"
+DRIZZLE_VER="0.17.0"
 
 set -x
 if [[ ! -f "Drizzle/tool/drizzle-$DRIZZLE_VER-with-deps.jar" ]]; then
@@ -350,6 +350,55 @@ eval "BPSE=($BPS)"
 
 arduino-cli compile -v --fqbn "$FQBN" "${BPSE[@]}" ./my-project
 ```
+
+
+Remote Control (for LLM agents and scripts)
+-------------------------------------------
+
+Inside Arduino IDE __1.8.19__, Drizzle accepts commands from programs running on the same computer: an LLM agent
+or a script can compile a sketch exactly like the __Verify__ button does, apply the markers, or get auto-generated
+markers, while the user watches the results in the IDE.
+
+When the IDE starts, Drizzle writes a launcher that starts its CLI with the IDE's own Java:
+
+* Windows: `%USERPROFILE%\.drizzle\bin\drizzle.cmd`
+* Linux / macOS: `~/.drizzle/bin/drizzle`
+
+```
+drizzle --remote list                                   # running IDEs and their open sketches
+drizzle --remote open --sketch ~/Arduino/blink
+drizzle --remote apply-markers --sketch ~/Arduino/blink
+drizzle --remote compile --sketch ~/Arduino/blink       # errors come back as file/line/column/message
+drizzle --remote autogen-markers --sketch ~/Arduino/blink --mode all
+drizzle --remote list-fqbns
+drizzle --remote cancel <job-id>                        # stops a running command
+```
+
+Every command prints one JSON object, and the exit code tells what to do next (see `drizzle --help`). Commands
+refuse to work over unsaved changes in the IDE; files changed, added or deleted on disk get reloaded in the IDE
+first. Only one command runs at a time. `apply-markers`, `compile` and `autogen-markers` also don't overlap with
+Drizzle actions started in the IDE, __Verify__ or __Upload__: whichever starts second is refused as busy. A remote
+command that hangs (e.g. on a stalled download) can be stopped from the IDE via
+__Tools → Drizzle → Cancel Remote Command__.
+
+[skills/drizzle-arduino/SKILL.md](skills/drizzle-arduino/SKILL.md) is a ready-made skill that teaches an LLM agent
+(e.g. Claude Code) how to use it. To install it for all your projects:
+
+```
+npx skills add https://github.com/zhgzhg/Drizzle.git -g --skill drizzle-arduino
+```
+
+Without `-g` it's installed into the current project only. Alternatively, copy the `skills/drizzle-arduino` folder
+into your agent's skills folder, e.g. `~/.claude/skills/` for Claude Code.
+
+How it works and how it's protected:
+
+* The HTTP API listens on the loopback interface only, on a random port.
+* Each running IDE writes `instance-<pid>.properties` with the port and a random token into `~/.drizzle/instances`,
+  next to the launcher. Requests without the token, and requests coming from web pages, are rejected.
+* The CLI finds the IDE that has the sketch open, and deletes the files of IDEs that are no longer running.
+* `apply-markers` does what __Tools → Drizzle → Apply Markers__ does, including installing platforms from
+  `@BoardManager` URLs. Only point it at sketches you trust.
 
 
 How To Compile
