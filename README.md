@@ -86,6 +86,11 @@ The __drizzle.json__ file can be used instead of the annotated comments in the m
 it, for describing dependencies and settings. In this case __drizzle.json__ becomes the only settings/dependencies
 source, and any Drizzle markers found in the source code will be ignored.
 
+> __Watch out:__ nothing tells you that the markers are ignored. While a __drizzle.json__ exists, editing the markers
+> in the sketch has no effect, and `--parse` on a sketch file still shows them (see [CLI Extras](#cli-extras)). And if
+> __drizzle.json__ can't be read, e.g. because of a JSON syntax error, the IDE reports the error in its console and
+> quietly falls back to the markers.
+
 An example for __drizzle.json__ can read in the [CLI Extras](#cli-extras) section.
  
 
@@ -164,7 +169,8 @@ Supported Markers
   * To describe the path to the particular option `->` can be used
   * To separate multiple menu paths `||` can be used
   * Menu matching is case-sensitive
-  * Menu matching will be performed in the order of definition and __will stop immediately once a match is found__. Always define the
+  * Menu matching will be performed in the order of definition and __will stop immediately once a match is found__ for the menu: when
+    several matching markers set the same menu, the first one wins, and the later ones still set the other menus. Always define the
     concrete rules in the beginning, and the less concrete at the end.  
   * Examples:
     * `@BoardSettings esp32::esp32wrover::Flash Frequency->40MHz`
@@ -179,7 +185,8 @@ Supported Markers
   * All the markers are attempted to be applied while matching against the current selected board.
   * To match all provider packages, platforms, and/or board ids or board names a `*` can be used
   * The matching is case-sensitive
-  * The matching will be performed in the order of definition - from top to bottom and from left to right and __will stop immediately once a match is found__.
+  * The matching will be performed in the order of definition - from top to bottom and from left to right and __will stop immediately once a match is found__
+    for the definition: when several matching markers define the same preference, the first one wins, and the later ones still add their other definitions.
 Always define the concrete rules in the beginning, and the less concrete at the end.
   * Examples:
     * `@Preferences esp32::esp32::esp32wrover::compiler.cpp.extra_flags=-std=gnu++17 -MMD -c -DMY_DEFINITION||compiler.c.extra_flags=-DMYDEFINITION2`
@@ -208,6 +215,15 @@ CLI Extras
 
 Drizzle offers CLI parsing of any Arduino sketch file, printing the recognized marker settings in JSON format. The reverse operation, where
 from JSON file Drizzle markers will be produced is also supported.
+
+`--parse` behaves differently for a sketch folder and for a sketch file:
+
+* __Sketch folder__ (`--parse ./my-project`): like the IDE, it respects __drizzle.json__. If the folder contains one,
+  its settings are printed in the same JSON format and the markers are ignored; otherwise the markers of the main sketch
+  file (`my-project.ino`) are. An unreadable __drizzle.json__ makes it fail with exit code -5 instead of falling back
+  to the markers.
+* __Sketch file__ (`--parse ./my-project/my-project.ino`): it always parses that file's markers, even when a
+  __drizzle.json__ sits next to it.
 
 For e.g. `java -jar drizzle-0.17.0-with-deps.jar --parse hello-world.ino` will produce:
 
@@ -315,6 +331,8 @@ fi
 ```
 
 #### Produce Drizzle JSON file:
+
+Parse the project folder, not the `.ino` file, so a __drizzle.json__ of the project is respected just like in the IDE:
 
 ```
 java -jar Drizzle/tool/drizzle-$DRIZZLE_VER-with-deps.jar --parse ./my-project >my-project.json
