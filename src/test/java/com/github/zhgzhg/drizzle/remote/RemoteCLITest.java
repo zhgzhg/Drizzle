@@ -318,11 +318,37 @@ class RemoteCLITest {
     }
 
     @Test
+    void uploadsThroughTheChosenPortAndProgrammer() throws Exception {
+        startInstance(1, blink);
+
+        assertEquals(RemoteCLI.EXIT_OK, cli("upload", "--sketch", blink.getPath(), "--port", "COM5",
+                "--programmer", "arduino:usbasp", "--verbose"));
+        assertEquals("upload", lastOutput.get("command"));
+        Map<String, String> args = handlers.get(0).lastArgs;
+        assertEquals("COM5", args.get(RemoteProtocol.ARG_PORT));
+        assertEquals("arduino:usbasp", args.get(RemoteProtocol.ARG_PROGRAMMER));
+        assertEquals("true", args.get(RemoteProtocol.ARG_VERBOSE));
+
+        assertEquals(RemoteCLI.EXIT_OK, cli("upload", "--sketch", blink.getPath()));
+        assertFalse(handlers.get(0).lastArgs.containsKey(RemoteProtocol.ARG_PORT), "the IDE's selected port gets used");
+        assertFalse(handlers.get(0).lastArgs.containsKey(RemoteProtocol.ARG_PROGRAMMER));
+
+        assertEquals(RemoteCLI.EXIT_FAILED, cli("upload", "--sketch", blink.getPath(), "--port", "COM99"));
+        assertEquals(RemoteProtocol.ERR_PORT_UNAVAILABLE, outputMap("error").get("code"));
+
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("compile", "--sketch", blink.getPath(), "--port", "COM5"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("upload", "--sketch", blink.getPath(), "--programmer", " "));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("upload", "--port", "COM5"));
+    }
+
+    @Test
     void routesCommandsWithoutSketchToTheOnlyInstance() throws Exception {
         RemoteServer only = startInstance(1, blink);
 
         assertEquals(RemoteCLI.EXIT_OK, cli("list-fqbns"));
         assertEquals(only.instanceId(), lastOutput.get("instance"));
+        assertEquals(RemoteCLI.EXIT_OK, cli("list-ports"));
+        assertEquals(RemoteCLI.EXIT_OK, cli("list-programmers"));
 
         assertEquals(RemoteCLI.EXIT_OK, cli("status", "--sketch", blink.getPath()));
         assertEquals(blink.getPath(), outputMap("sketch").get("folder"));

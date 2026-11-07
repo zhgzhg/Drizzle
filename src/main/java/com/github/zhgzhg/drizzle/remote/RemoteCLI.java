@@ -30,7 +30,11 @@ public final class RemoteCLI {
     static final long DEFAULT_TIMEOUT_SECONDS = 600;
 
     private static final List<String> JOB_COMMANDS = Arrays.asList(RemoteProtocol.CMD_APPLY_MARKERS,
-            RemoteProtocol.CMD_COMPILE, RemoteProtocol.CMD_AUTOGEN_MARKERS, RemoteProtocol.CMD_LIST_FQBNS);
+            RemoteProtocol.CMD_COMPILE, RemoteProtocol.CMD_UPLOAD, RemoteProtocol.CMD_AUTOGEN_MARKERS,
+            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS);
+    // about the whole IDE; --sketch only helps to pick the IDE
+    private static final List<String> IDE_COMMANDS = Arrays.asList(RemoteProtocol.CMD_LIST_FQBNS,
+            RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS);
 
     private final Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     private final RemoteClient client;
@@ -54,8 +58,11 @@ public final class RemoteCLI {
                 + "\t%1$s --remote open --sketch <path> [--instance <id>]%n"
                 + "\t%1$s --remote apply-markers --sketch <path>%n"
                 + "\t%1$s --remote compile --sketch <path> [--verbose]%n"
+                + "\t%1$s --remote upload --sketch <path> [--port <address>] [--programmer <id>] [--verbose]%n"
                 + "\t%1$s --remote autogen-markers --sketch <path> [--mode board|all]%n"
                 + "\t%1$s --remote list-fqbns [--sketch <path> | --instance <id>]%n"
+                + "\t%1$s --remote list-ports [--sketch <path> | --instance <id>]%n"
+                + "\t%1$s --remote list-programmers [--sketch <path> | --instance <id>]%n"
                 + "\t%1$s --remote job <job-id> [--instance <id>] [--wait]%n"
                 + "\t%1$s --remote cancel <job-id> [--instance <id>]%n"
                 + "%n"
@@ -167,7 +174,11 @@ public final class RemoteCLI {
             throw new RemoteException(RemoteProtocol.ERR_USAGE, "Unknown remote command: " + options.command);
         }
 
-        boolean needsSketch = !RemoteProtocol.CMD_LIST_FQBNS.equals(options.command);
+        if ((options.port != null || options.programmer != null) && !RemoteProtocol.CMD_UPLOAD.equals(options.command)) {
+            throw new RemoteException(RemoteProtocol.ERR_USAGE, "--port and --programmer are only for upload");
+        }
+
+        boolean needsSketch = !IDE_COMMANDS.contains(options.command);
         String sketchArg = needsSketch ? options.requireSketch() : options.sketch;
         File sketch = sketchArg != null ? RemoteClient.canonicalSketchPath(sketchArg) : null;
         File folder = sketch != null ? RemoteClient.sketchFolderOf(sketch) : null;
@@ -178,6 +189,8 @@ public final class RemoteCLI {
         if (sketch != null) args.put(RemoteProtocol.ARG_SKETCH, sketch.getPath());
         if (options.verbose) args.put(RemoteProtocol.ARG_VERBOSE, "true");
         if (options.mode != null) args.put(RemoteProtocol.ARG_MODE, options.mode);
+        if (options.port != null) args.put(RemoteProtocol.ARG_PORT, options.port);
+        if (options.programmer != null) args.put(RemoteProtocol.ARG_PROGRAMMER, options.programmer);
         return submitAndReport(chosen, options.command, args, options);
     }
 
@@ -327,6 +340,8 @@ public final class RemoteCLI {
     static int exitCodeOf(final String code) {
         switch (code) {
             case RemoteProtocol.ERR_FAILED:
+            case RemoteProtocol.ERR_PORT_UNAVAILABLE:
+            case RemoteProtocol.ERR_PASSWORD_REQUIRED:
             case RemoteProtocol.ERR_CANCELLED: return EXIT_FAILED;
             case RemoteProtocol.ERR_USAGE:
             case RemoteProtocol.ERR_BAD_REQUEST:
@@ -347,6 +362,8 @@ public final class RemoteCLI {
         String sketch;
         String instance;
         String mode;
+        String port;
+        String programmer;
         long timeoutSeconds = DEFAULT_TIMEOUT_SECONDS;
         boolean verbose;
         boolean noWait;
@@ -365,6 +382,8 @@ public final class RemoteCLI {
                 switch (arg) {
                     case "--sketch": o.sketch = valueOf(args, ++i, arg); break;
                     case "--instance": o.instance = valueOf(args, ++i, arg); break;
+                    case "--port": o.port = nonBlankValueOf(args, ++i, arg); break;
+                    case "--programmer": o.programmer = nonBlankValueOf(args, ++i, arg); break;
                     case "--mode":
                         o.mode = valueOf(args, ++i, arg);
                         if (!"board".equals(o.mode) && !"all".equals(o.mode)) {
@@ -408,6 +427,14 @@ public final class RemoteCLI {
                 throw new RemoteException(RemoteProtocol.ERR_USAGE, option + " needs a value");
             }
             return args[i];
+        }
+
+        private static String nonBlankValueOf(final String[] args, final int i, final String option) throws RemoteException {
+            String value = valueOf(args, i, option).trim();
+            if (value.isEmpty()) {
+                throw new RemoteException(RemoteProtocol.ERR_USAGE, option + " needs a value");
+            }
+            return value;
         }
     }
 }

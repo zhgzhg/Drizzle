@@ -13,7 +13,7 @@ import java.util.function.Consumer;
 /**
  * Stands in for the IDE. Its behaviour depends on the sketch's folder name: "broken" fails to compile, "unsaved" has
  * unsaved changes, "slow" waits for {@link #release} (or an interrupt), "stuck" waits for {@link #release} ignoring
- * interrupts, like a stalled download.
+ * interrupts, like a stalled download. Uploading to port COM99 fails because it isn't available.
  */
 class FakeCommandHandler implements RemoteCommandHandler {
     final List<File> openSketchFolders = new ArrayList<>();
@@ -52,12 +52,14 @@ class FakeCommandHandler implements RemoteCommandHandler {
     @Override
     public boolean supports(final String command) {
         return Arrays.asList(RemoteProtocol.CMD_OPEN, RemoteProtocol.CMD_COMPILE, RemoteProtocol.CMD_APPLY_MARKERS,
-                RemoteProtocol.CMD_LIST_FQBNS).contains(command);
+                RemoteProtocol.CMD_UPLOAD, RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS,
+                RemoteProtocol.CMD_LIST_PROGRAMMERS).contains(command);
     }
 
     @Override
     public boolean isExclusive(final String command) {
-        return !RemoteProtocol.CMD_OPEN.equals(command) && !RemoteProtocol.CMD_LIST_FQBNS.equals(command);
+        return !Arrays.asList(RemoteProtocol.CMD_OPEN, RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS,
+                RemoteProtocol.CMD_LIST_PROGRAMMERS).contains(command);
     }
 
     @Override
@@ -76,6 +78,9 @@ class FakeCommandHandler implements RemoteCommandHandler {
 
         if (sketch.contains("unsaved")) {
             throw new RemoteException(RemoteProtocol.ERR_UNSAVED_CHANGES, "The sketch has unsaved changes");
+        }
+        if (RemoteProtocol.CMD_UPLOAD.equals(command) && "COM99".equals(args.get(RemoteProtocol.ARG_PORT))) {
+            throw new RemoteException(RemoteProtocol.ERR_PORT_UNAVAILABLE, "The port COM99 isn't available");
         }
 
         log.accept(command + " started\n");

@@ -97,4 +97,37 @@ class ActivityGuardTest {
             assertEquals("remote compile", ActivityGuard.busyDescription());
         }
     }
+
+    @Test
+    void letsTheCommandNoticeACancelWhoseInterruptGotSwallowed() throws Exception {
+        CountDownLatch holding = new CountDownLatch(1);
+        CountDownLatch cancelled = new CountDownLatch(1);
+        AtomicBoolean heldBefore = new AtomicBoolean();
+        AtomicBoolean heldAfter = new AtomicBoolean(true);
+
+        Thread command = new Thread(() -> {
+            ActivityGuard.Lease lease = ActivityGuard.tryRemote("remote upload");
+            heldBefore.set(ActivityGuard.holdsRemote());
+            holding.countDown();
+            boolean done = false;
+            while (!done) {
+                try {
+                    done = cancelled.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    // like Arduino IDE's uploader, which ignores interrupts
+                }
+            }
+            heldAfter.set(ActivityGuard.holdsRemote());
+            lease.close();
+        });
+        command.start();
+        assertTrue(holding.await(10, TimeUnit.SECONDS));
+        assertFalse(ActivityGuard.holdsRemote(), "only the command's own thread holds it");
+
+        ActivityGuard.cancelRemote();
+        cancelled.countDown();
+        command.join(10000);
+        assertTrue(heldBefore.get());
+        assertFalse(heldAfter.get());
+    }
 }

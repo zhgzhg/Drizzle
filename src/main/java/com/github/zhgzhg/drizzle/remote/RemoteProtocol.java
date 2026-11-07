@@ -19,10 +19,15 @@ public final class RemoteProtocol {
     public static final String CMD_COMPILE = "compile";
     public static final String CMD_AUTOGEN_MARKERS = "autogen-markers";
     public static final String CMD_LIST_FQBNS = "list-fqbns";
+    public static final String CMD_UPLOAD = "upload";
+    public static final String CMD_LIST_PORTS = "list-ports";
+    public static final String CMD_LIST_PROGRAMMERS = "list-programmers";
 
     public static final String ARG_SKETCH = "sketch";
     public static final String ARG_VERBOSE = "verbose";
     public static final String ARG_MODE = "mode";
+    public static final String ARG_PORT = "port";
+    public static final String ARG_PROGRAMMER = "programmer";
 
     public static final String JOB_RUNNING = "running";
     public static final String JOB_DONE = "done";
@@ -38,6 +43,8 @@ public final class RemoteProtocol {
     public static final String ERR_SKETCH_NOT_OPEN = "sketch_not_open";
     public static final String ERR_UNSAVED_CHANGES = "unsaved_changes";
     public static final String ERR_FAILED = "failed";
+    public static final String ERR_PORT_UNAVAILABLE = "port_unavailable";
+    public static final String ERR_PASSWORD_REQUIRED = "password_required";
     public static final String ERR_IDE_UNRESPONSIVE = "ide_unresponsive";
     public static final String ERR_INTERNAL = "internal";
 

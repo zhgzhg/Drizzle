@@ -92,6 +92,18 @@ public final class ActivityGuard {
     }
 
     /**
+     * Lets a remote command notice a cancel even when the code it called swallowed the interrupt.
+     *
+     * @return whether the current thread runs the remote command that holds the lease, which a cancel ends
+     */
+    public static boolean holdsRemote() {
+        synchronized (MONITOR) {
+            String remote = System.getProperty(REMOTE_PROPERTY);
+            return remote != null && remote.startsWith(Thread.currentThread().getId() + "|");
+        }
+    }
+
+    /**
      * @return what keeps Drizzle busy, or null when it's idle
      */
     public static String busyDescription() {

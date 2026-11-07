@@ -156,12 +156,15 @@ class RemoteServerTest {
 
     @Test
     void waitsForActionsStartedInTheIDE() throws Exception {
-        try (ActivityGuard.Lease lease = ActivityGuard.tryLocal("Apply Markers")) {
+        try (ActivityGuard.Lease lease = ActivityGuard.tryLocal("Upload")) {
             assertRemoteError(RemoteProtocol.ERR_BUSY, () -> client.submit(info, RemoteProtocol.CMD_COMPILE, sketchArgs("/s/blink")));
+            assertRemoteError(RemoteProtocol.ERR_BUSY, () -> client.submit(info, RemoteProtocol.CMD_UPLOAD, sketchArgs("/s/blink")));
 
             // quick commands that don't interfere with the IDE's own actions still run
-            Map<String, Object> job = client.submit(info, RemoteProtocol.CMD_LIST_FQBNS, Collections.<String, String>emptyMap());
-            assertEquals(RemoteProtocol.JOB_DONE, client.waitFor(info, (String) job.get("id"), 10000, null).get("state"));
+            for (String command : new String[] { RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS }) {
+                Map<String, Object> job = client.submit(info, command, Collections.<String, String>emptyMap());
+                assertEquals(RemoteProtocol.JOB_DONE, client.waitFor(info, (String) job.get("id"), 10000, null).get("state"));
+            }
             assertTrue(lease.isHeld());
         }
     }

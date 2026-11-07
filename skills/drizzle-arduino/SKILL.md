@@ -1,9 +1,9 @@
 ---
 name: drizzle-arduino
-description: Build Arduino sketches and install their dependencies through a running Arduino IDE 1.8.19 with
-  the Drizzle plugin. Use when asked to compile/verify an Arduino sketch, or to fetch the boards, libraries and
-  board settings that its Drizzle markers (@BoardManager, @Board, @BoardSettings, @DependsOn, @Preferences) or its
-  drizzle.json declare.
+description: Build Arduino sketches, upload them to boards, and install their dependencies through a running
+  Arduino IDE 1.8.19 with the Drizzle plugin. Use when asked to compile/verify or upload an Arduino sketch, or to
+  fetch the boards, libraries and board settings that its Drizzle markers (@BoardManager, @Board, @BoardSettings,
+  @DependsOn, @Preferences) or its drizzle.json declare.
 ---
 
 # Drizzle remote control
@@ -49,8 +49,8 @@ Other commands:
   Nothing is written: copy what you need into the sketch's markers or `drizzle.json` yourself.
 - `drizzle --remote list-fqbns [--sketch <path>]` lists the boards the IDE knows, as `package:platform:board`.
   Markers separate these parts with `::` instead of `:`; see the reference.
-- `drizzle --remote status --sketch <path>` shows the IDE's state: selected board, open sketches, unsaved
-  changes, the running job.
+- `drizzle --remote status --sketch <path>` shows the IDE's state: selected board, port and programmer, open
+  sketches, unsaved changes, the running job.
 - `drizzle --parse <sketch folder>` prints what the sketch declares (its `drizzle.json`, or else its markers) as JSON,
   without needing the IDE.
 
@@ -64,6 +64,8 @@ Every command prints one JSON object on stdout; `ok` tells whether it succeeded 
 | 0 | Success | Continue |
 | 1 | The command ran but failed (e.g. compilation errors) | Read `result` and `log`, fix, retry |
 | 1 | `error.code` is `cancelled`: the user (or you) stopped the command | Don't retry without asking the user |
+| 1 | `error.code` is `port_unavailable`: no port is selected, or it isn't connected | See [Uploading](#uploading) |
+| 1 | `error.code` is `password_required`: a network board needs its password | See [Uploading](#uploading) |
 | 2 | Bad arguments, or the sketch is open in more than one IDE | Fix the call; pass `--instance <id>` from `list` |
 | 3 | No running IDE with Drizzle | Ask the user to start Arduino IDE |
 | 4 | Sketch not open in any IDE | Run `open` first |
@@ -80,12 +82,40 @@ On exit code 7 the job keeps running in the IDE; its id is in the JSON output (`
 
 ## Uploading
 
-Drizzle doesn't flash boards. When the sketch should go onto the board, ask the user to click Upload in the IDE.
-If flashing fails to connect (e.g. "Failed to connect", "could not open port", a timeout) and several serial ports
-exist, the selected port is probably the wrong one: ask the user to pick the right one under Tools → Port and retry.
+An upload replaces the program on the board, and with it what the board does to whatever it's connected to. Upload
+only when the user asks for it, never just because a compile succeeded.
 
-`@ArduinoTool` markers (IDE plugins) aren't installed remotely: ask the user to use Tools → Drizzle → Install tools
-marked with @ArduinoTool and to restart the IDE afterwards.
+1. `drizzle --remote list-ports` lists the ports as Tools → Port does and marks the selected one. A port can show
+   the board the IDE recognises on it (`board`, `fqbn`) and its USB ids (`vid`, `pid`). Ports without USB ids, such
+   as Bluetooth COM ports, are rarely the board. If more than one port could be the board, ask the user which one.
+2. `drizzle --remote upload --sketch <path> [--port <address>]` compiles and uploads like the IDE's Upload button.
+   `--port` selects that port in the IDE first, as Tools → Port does, and it stays selected; without it the IDE's
+   selected port is used. On failure, `result.error.stage` says whether compiling or uploading failed, and
+   `result.errorOutput` holds what the uploader reported. `--verbose` makes the uploader report in detail.
+
+When an upload fails to reach the board (e.g. "not in sync", "Failed to connect", a timeout), don't change the code:
+
+- with several ports, the selected one is probably wrong: ask the user;
+- some boards need their BOOT or RESET button pressed while uploading: ask the user;
+- `port_unavailable`: the port isn't connected (anymore), or none is selected. The message lists the available
+  ports; pass `--port` if exactly one of them is clearly the board, otherwise ask the user.
+
+`--programmer <id>` uploads through a programmer, like Upload Using Programmer, with an id from
+`drizzle --remote list-programmers` (the programmers of the selected board). Use it only when the user asks: on AVR
+boards it erases the bootloader, so uploading through the port stops working until a bootloader is burned again. In
+that list, `uploadUsesProgrammer: true` means the board has no bootloader: even a plain upload goes through the
+selected programmer.
+
+Network (OTA) ports with `passwordRequired: true` fail with `password_required`: the IDE asks for the password in a
+dialog. Ask the user to upload once from the IDE; it then remembers the password until it exits.
+
+If the IDE reports `upload` as an unknown command, its Drizzle is too old: ask the user to update Drizzle.
+
+## Left to the user
+
+- `@ArduinoTool` markers (IDE plugins): ask the user to use Tools → Drizzle → Install tools marked with
+  @ArduinoTool, and to restart the IDE afterwards.
+- Burning a bootloader (Tools → Burn Bootloader).
 
 ## Rules
 

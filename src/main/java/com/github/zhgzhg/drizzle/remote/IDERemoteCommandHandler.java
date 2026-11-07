@@ -3,6 +3,7 @@ package com.github.zhgzhg.drizzle.remote;
 import com.github.zhgzhg.drizzle.Drizzle;
 import com.github.zhgzhg.drizzle.DrizzleCLI;
 import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
+import com.github.zhgzhg.drizzle.utils.arduino.UploadTargets;
 import processing.app.Base;
 import processing.app.BaseNoGui;
 import processing.app.Editor;
@@ -27,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Carries out remote commands inside Arduino IDE. Commands about a sketch are forwarded to the Drizzle instance of
@@ -43,7 +45,10 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
     public static final String ENDPOINT_PROPERTY = "drizzle.remote.endpoint";
 
     private static final List<String> COMMANDS = Arrays.asList(RemoteProtocol.CMD_OPEN, RemoteProtocol.CMD_APPLY_MARKERS,
-            RemoteProtocol.CMD_COMPILE, RemoteProtocol.CMD_AUTOGEN_MARKERS, RemoteProtocol.CMD_LIST_FQBNS);
+            RemoteProtocol.CMD_COMPILE, RemoteProtocol.CMD_UPLOAD, RemoteProtocol.CMD_AUTOGEN_MARKERS,
+            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS);
+    private static final List<String> NON_EXCLUSIVE_COMMANDS = Arrays.asList(RemoteProtocol.CMD_OPEN,
+            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS);
 
     private static final long UI_TIMEOUT_SECONDS = 10; // shorter than the client's read timeout
     private static final long OPEN_TIMEOUT_SECONDS = 60;
@@ -55,6 +60,9 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
         status.put("drizzle", DrizzleCLI.version());
         status.put("ide", UpdateUtils.arduinoVersion());
         status.put("board", selectedBoard());
+        // the CLI finds instances through their status; a problem with these details mustn't hide the instance
+        status.put("port", orNull(UploadTargets::describeSelectedPort));
+        status.put("programmer", orNull(UploadTargets::describeSelectedProgrammer));
         status.put("sketches", onUiThread(() -> {
             List<Map<String, Object>> sketches = new ArrayList<>();
             for (Editor editor : editors()) {
@@ -84,11 +92,11 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
     }
 
     /**
-     * Opening a sketch and listing boards are quick and change nothing the IDE's own actions depend on.
+     * Opening a sketch and the listings are quick and change nothing the IDE's own actions depend on.
      */
     @Override
     public boolean isExclusive(final String command) {
-        return !RemoteProtocol.CMD_OPEN.equals(command) && !RemoteProtocol.CMD_LIST_FQBNS.equals(command);
+        return !NON_EXCLUSIVE_COMMANDS.contains(command);
     }
 
     @Override
@@ -111,18 +119,37 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
                 result.put("fqbns", Drizzle.availableFqbns());
                 return result;
             }
+            if (RemoteProtocol.CMD_LIST_PORTS.equals(command)) {
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("ok", true);
+                result.put("selected", UploadTargets.describeSelectedPort());
+                result.put("ports", UploadTargets.describePorts());
+                return result;
+            }
+            if (RemoteProtocol.CMD_LIST_PROGRAMMERS.equals(command)) {
+                Map<String, Object> result = new LinkedHashMap<>();
+                result.put("ok", true);
+                result.put("board", selectedBoard());
+                result.put("selected", UploadTargets.selectedProgrammerId());
+                result.put("uploadUsesProgrammer", UploadTargets.uploadUsesProgrammer());
+                result.put("programmers", UploadTargets.describeProgrammers());
+                return result;
+            }
 
             Editor editor = findEditor(requireSketch(args));
             Map<String, Object> result = forwardToEditor(editor, command, args);
 
-            if (RemoteProtocol.CMD_COMPILE.equals(command)) {
+            boolean compiles = RemoteProtocol.CMD_COMPILE.equals(command) || RemoteProtocol.CMD_UPLOAD.equals(command);
+            if (compiles) {
                 List<Map<String, Object>> diagnostics;
                 synchronized (output) {
                     diagnostics = CompilerDiagnostics.parse(output.toString());
                 }
                 resolveSketchFileNames(editor, diagnostics);
                 result.put("diagnostics", diagnostics);
-            } else {
+            }
+            if (!RemoteProtocol.CMD_COMPILE.equals(command)) {
+                // for an upload, what the uploader complained about (e.g. avrdude)
                 result.put("errorOutput", capture.errorLines());
             }
             result.put("board", selectedBoard());
@@ -280,6 +307,14 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
         description.put("fqbn", board.getFQBN());
         description.put("name", board.getName());
         return description;
+    }
+
+    private static <T> T orNull(final Supplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     private static String requireSketch(final Map<String, String> args) throws RemoteException {

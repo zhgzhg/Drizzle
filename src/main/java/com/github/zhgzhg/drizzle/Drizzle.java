@@ -19,6 +19,7 @@ import com.github.zhgzhg.drizzle.utils.arduino.ArduinoIDEToolsInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.IDECompilationHook;
+import com.github.zhgzhg.drizzle.utils.arduino.RemoteUploader;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
 import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
 import com.github.zhgzhg.drizzle.utils.collection.CollectionUtils;
@@ -1340,6 +1341,10 @@ public class Drizzle implements Tool {
                     return compileForRemote("true".equals(args.get(RemoteProtocol.ARG_VERBOSE)));
                 case RemoteProtocol.CMD_AUTOGEN_MARKERS:
                     return generateMarkersForRemote(!"board".equals(args.get(RemoteProtocol.ARG_MODE)));
+                case RemoteProtocol.CMD_UPLOAD:
+                    return new RemoteUploader(this.editor, this.uiLocator, this.logProxy).upload(
+                            (String) args.get(RemoteProtocol.ARG_PORT), (String) args.get(RemoteProtocol.ARG_PROGRAMMER),
+                            "true".equals(args.get(RemoteProtocol.ARG_VERBOSE)));
                 default:
                     return remoteFailure(RemoteProtocol.ERR_BAD_REQUEST, "Unsupported command: " + command);
             }
@@ -1425,17 +1430,8 @@ public class Drizzle implements Tool {
                 reportInUI = () -> this.editor.statusError("The build didn't run; see the console");
             }
         } catch (RunnerException e) {
-            Map<String, Object> error = new LinkedHashMap<>();
-            error.put("message", e.getMessage() != null ? e.getMessage() : String.valueOf(e.getCause()));
-            if (e.hasCodeFile()) {
-                // without a file the line is meaningless: RunnerException(Exception) leaves it at 0
-                error.put("file", e.getCodeFile().getFile().getAbsolutePath());
-                if (e.hasCodeLine()) error.put("line", e.getCodeLine() + 1); // RunnerException counts lines from 0
-                if (e.hasCodeLine() && e.getCodeColumn() > 0) error.put("column", e.getCodeColumn());
-            }
-
             result.put("ok", false);
-            result.put("error", error);
+            result.put("error", RemoteUploader.describeCompileError(e));
             reportInUI = () -> this.editor.statusError(e);
         } catch (PreferencesMapException | IOException e) {
             result.put("ok", false);
