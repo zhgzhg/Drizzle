@@ -6,11 +6,16 @@ import com.google.gson.GsonBuilder;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * {@code drizzle --remote <command> ...}: sends commands to a running Arduino IDE with Drizzle and prints the
@@ -31,10 +36,25 @@ public final class RemoteCLI {
 
     private static final List<String> JOB_COMMANDS = Arrays.asList(RemoteProtocol.CMD_APPLY_MARKERS,
             RemoteProtocol.CMD_COMPILE, RemoteProtocol.CMD_UPLOAD, RemoteProtocol.CMD_AUTOGEN_MARKERS,
-            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS);
+            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS,
+            RemoteProtocol.CMD_SERIAL_OPEN, RemoteProtocol.CMD_SERIAL_CLOSE, RemoteProtocol.CMD_SERIAL_SEND);
     // about the whole IDE; --sketch only helps to pick the IDE
     private static final List<String> IDE_COMMANDS = Arrays.asList(RemoteProtocol.CMD_LIST_FQBNS,
-            RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS);
+            RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS, RemoteProtocol.CMD_SERIAL_OPEN,
+            RemoteProtocol.CMD_SERIAL_CLOSE, RemoteProtocol.CMD_SERIAL_SEND, RemoteProtocol.CMD_SERIAL_LOG);
+    // options that only some commands take
+    private static final Map<String, List<String>> OPTION_COMMANDS = new LinkedHashMap<>();
+    static {
+        OPTION_COMMANDS.put("--port", Arrays.asList(RemoteProtocol.CMD_UPLOAD, RemoteProtocol.CMD_SERIAL_OPEN));
+        OPTION_COMMANDS.put("--programmer", Collections.singletonList(RemoteProtocol.CMD_UPLOAD));
+        OPTION_COMMANDS.put("--baud", Collections.singletonList(RemoteProtocol.CMD_SERIAL_OPEN));
+        OPTION_COMMANDS.put("--text", Collections.singletonList(RemoteProtocol.CMD_SERIAL_SEND));
+        OPTION_COMMANDS.put("--line-ending", Collections.singletonList(RemoteProtocol.CMD_SERIAL_SEND));
+        for (String option : Arrays.asList("--from", "--to", "--wait-for-regex", "--max-lines")) {
+            OPTION_COMMANDS.put(option, Collections.singletonList(RemoteProtocol.CMD_SERIAL_LOG));
+        }
+    }
+    static final List<String> LINE_ENDINGS = Arrays.asList("none", "nl", "cr", "crlf");
 
     private final Gson gson = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     private final RemoteClient client;
@@ -63,23 +83,34 @@ public final class RemoteCLI {
                 + "\t%1$s --remote list-fqbns [--sketch <path> | --instance <id>]%n"
                 + "\t%1$s --remote list-ports [--sketch <path> | --instance <id>]%n"
                 + "\t%1$s --remote list-programmers [--sketch <path> | --instance <id>]%n"
+                + "\t%1$s --remote serial-open [--port <address>] [--baud <rate>] [--sketch <path> | --instance <id>]%n"
+                + "\t%1$s --remote serial-log [--from <point>] [--to <point>] [--wait-for-regex <regex>]%n"
+                + "\t\t[--timeout <seconds>] [--max-lines <n>] [--sketch <path> | --instance <id>]%n"
+                + "\t%1$s --remote serial-send --text <text> [--line-ending none|nl|cr|crlf] [--sketch <path> | --instance <id>]%n"
+                + "\t%1$s --remote serial-close [--sketch <path> | --instance <id>]%n"
                 + "\t%1$s --remote job <job-id> [--instance <id>] [--wait]%n"
                 + "\t%1$s --remote cancel <job-id> [--instance <id>]%n"
                 + "%n"
                 + "\tCommands that run in the IDE also accept --timeout <seconds> (default %2$d), --no-wait, and%n"
                 + "\t--progress (copies the IDE's output to stderr while waiting).%n"
+                + "\tserial-log returns what the Serial Monitor (or Plotter) received. A <point> is start, upload, now,%n"
+                + "\ta line number (the \"next\" of an earlier call), a time (14:03:12.345) or a time relative to now (-30s);%n"
+                + "\t--to also takes +<duration> after --from. A call waits when it gets --wait-for-regex, --timeout%n"
+                + "\t(default %3$d, at most %4$d seconds; alone, it collects for that long) or a --to in the future.%n"
                 + "\tExit codes: 0 ok, 1 failed or cancelled, 2 usage, 3 no IDE running, 4 sketch not open, 5 busy,%n"
                 + "\t6 unsaved changes, 7 timeout (the command keeps running), 8 IDE not responding or communication error.%n",
-                launcher, DEFAULT_TIMEOUT_SECONDS);
+                launcher, DEFAULT_TIMEOUT_SECONDS, SerialLogQuery.DEFAULT_WAIT_SECONDS, SerialLogQuery.MAX_WAIT_SECONDS);
     }
 
     public int execute(final String[] args) {
         try {
             Options options = Options.parse(args);
+            checkCommandSpecificOptions(options);
             switch (options.command) {
                 case "list": return list();
                 case "status": return status(options);
                 case RemoteProtocol.CMD_OPEN: return open(options);
+                case RemoteProtocol.CMD_SERIAL_LOG: return serialLog(options);
                 case "job": return job(options);
                 case "cancel": return cancel(options);
                 default: return runJob(options);
@@ -169,13 +200,21 @@ public final class RemoteCLI {
         return submitAndReport(chosen, RemoteProtocol.CMD_OPEN, args, options);
     }
 
+    private static void checkCommandSpecificOptions(final Options options) throws RemoteException {
+        for (String option : options.given) {
+            List<String> commands = OPTION_COMMANDS.get(option);
+            if (commands != null && !commands.contains(options.command)) {
+                throw new RemoteException(RemoteProtocol.ERR_USAGE, option + " is only for " + String.join(" and ", commands));
+            }
+        }
+        if (RemoteProtocol.CMD_SERIAL_SEND.equals(options.command) && options.text == null) {
+            throw new RemoteException(RemoteProtocol.ERR_USAGE, "serial-send needs --text <text>");
+        }
+    }
+
     private int runJob(final Options options) throws RemoteException, IOException {
         if (!JOB_COMMANDS.contains(options.command)) {
             throw new RemoteException(RemoteProtocol.ERR_USAGE, "Unknown remote command: " + options.command);
-        }
-
-        if ((options.port != null || options.programmer != null) && !RemoteProtocol.CMD_UPLOAD.equals(options.command)) {
-            throw new RemoteException(RemoteProtocol.ERR_USAGE, "--port and --programmer are only for upload");
         }
 
         boolean needsSketch = !IDE_COMMANDS.contains(options.command);
@@ -191,7 +230,34 @@ public final class RemoteCLI {
         if (options.mode != null) args.put(RemoteProtocol.ARG_MODE, options.mode);
         if (options.port != null) args.put(RemoteProtocol.ARG_PORT, options.port);
         if (options.programmer != null) args.put(RemoteProtocol.ARG_PROGRAMMER, options.programmer);
+        if (options.baud != null) args.put(RemoteProtocol.ARG_BAUD, options.baud);
+        if (options.text != null) args.put(RemoteProtocol.ARG_TEXT, options.text);
+        if (options.lineEnding != null) args.put(RemoteProtocol.ARG_LINE_ENDING, options.lineEnding);
         return submitAndReport(chosen, options.command, args, options);
+    }
+
+    /**
+     * Answered by the IDE without a job: reading doesn't interfere with anything, so it works while a job runs.
+     */
+    private int serialLog(final Options options) throws RemoteException, IOException {
+        Map<String, String> args = new LinkedHashMap<>();
+        if (options.from != null) args.put(RemoteProtocol.ARG_FROM, options.from);
+        if (options.to != null) args.put(RemoteProtocol.ARG_TO, options.to);
+        if (options.waitForRegex != null) args.put(RemoteProtocol.ARG_WAIT_FOR_REGEX, options.waitForRegex);
+        if (options.maxLines != null) args.put(RemoteProtocol.ARG_MAX_LINES, options.maxLines);
+        if (options.given.contains("--timeout")) args.put(RemoteProtocol.ARG_TIMEOUT, String.valueOf(options.timeoutSeconds));
+        try {
+            SerialLogQuery.fromArgs(args, System.currentTimeMillis(), ZoneId.systemDefault()); // mistakes, before asking the IDE
+        } catch (RemoteException e) {
+            throw new RemoteException(RemoteProtocol.ERR_USAGE, e.getMessage());
+        }
+
+        File sketch = options.sketch != null ? RemoteClient.canonicalSketchPath(options.sketch) : null;
+        File folder = sketch != null ? RemoteClient.sketchFolderOf(sketch) : null;
+        RemoteClient.LiveInstance chosen = client.select(client.discover(), options.instance, folder, false);
+
+        print(client.serialLog(chosen.info, args, SerialLogQuery.maxWaitSeconds(args)));
+        return EXIT_OK;
     }
 
     private int job(final Options options) throws RemoteException, IOException {
@@ -342,6 +408,7 @@ public final class RemoteCLI {
             case RemoteProtocol.ERR_FAILED:
             case RemoteProtocol.ERR_PORT_UNAVAILABLE:
             case RemoteProtocol.ERR_PASSWORD_REQUIRED:
+            case RemoteProtocol.ERR_MONITOR_CLOSED:
             case RemoteProtocol.ERR_CANCELLED: return EXIT_FAILED;
             case RemoteProtocol.ERR_USAGE:
             case RemoteProtocol.ERR_BAD_REQUEST:
@@ -364,11 +431,19 @@ public final class RemoteCLI {
         String mode;
         String port;
         String programmer;
+        String baud;
+        String text;
+        String lineEnding;
+        String from;
+        String to;
+        String waitForRegex;
+        String maxLines;
         long timeoutSeconds = DEFAULT_TIMEOUT_SECONDS;
         boolean verbose;
         boolean noWait;
         boolean wait;
         boolean progress;
+        final Set<String> given = new LinkedHashSet<>();
 
         static Options parse(final String[] args) throws RemoteException {
             if (args.length == 0) {
@@ -379,11 +454,30 @@ public final class RemoteCLI {
             o.command = args[0];
             for (int i = 1; i < args.length; ++i) {
                 String arg = args[i];
+                if (arg.startsWith("--")) o.given.add(arg);
                 switch (arg) {
                     case "--sketch": o.sketch = valueOf(args, ++i, arg); break;
                     case "--instance": o.instance = valueOf(args, ++i, arg); break;
                     case "--port": o.port = nonBlankValueOf(args, ++i, arg); break;
                     case "--programmer": o.programmer = nonBlankValueOf(args, ++i, arg); break;
+                    case "--baud":
+                        o.baud = nonBlankValueOf(args, ++i, arg);
+                        if (!o.baud.matches("[1-9][0-9]{0,8}")) {
+                            throw new RemoteException(RemoteProtocol.ERR_USAGE, "--baud needs a baud rate, e.g. 115200");
+                        }
+                        break;
+                    case "--text": o.text = valueOf(args, ++i, arg); break;
+                    case "--line-ending":
+                        o.lineEnding = valueOf(args, ++i, arg).trim().toLowerCase(Locale.ROOT);
+                        if (!LINE_ENDINGS.contains(o.lineEnding)) {
+                            throw new RemoteException(RemoteProtocol.ERR_USAGE, "--line-ending must be one of "
+                                    + String.join(", ", LINE_ENDINGS));
+                        }
+                        break;
+                    case "--from": o.from = nonBlankValueOf(args, ++i, arg); break;
+                    case "--to": o.to = nonBlankValueOf(args, ++i, arg); break;
+                    case "--wait-for-regex": o.waitForRegex = valueOf(args, ++i, arg); break;
+                    case "--max-lines": o.maxLines = nonBlankValueOf(args, ++i, arg); break;
                     case "--mode":
                         o.mode = valueOf(args, ++i, arg);
                         if (!"board".equals(o.mode) && !"all".equals(o.mode)) {

@@ -375,7 +375,8 @@ Remote Control (for LLM agents and scripts)
 
 Inside Arduino IDE __1.8.19__, Drizzle accepts commands from programs running on the same computer: an LLM agent
 or a script can compile a sketch exactly like the __Verify__ button does, upload it like the __Upload__ button does,
-apply the markers, or get auto-generated markers, while the user watches the results in the IDE.
+read what the board prints in the __Serial Monitor__, apply the markers, or get auto-generated markers, while the
+user watches the results in the IDE.
 
 When the IDE starts, Drizzle writes a launcher that starts its CLI with the IDE's own Java:
 
@@ -389,6 +390,8 @@ drizzle --remote apply-markers --sketch ~/Arduino/blink
 drizzle --remote compile --sketch ~/Arduino/blink       # errors come back as file/line/column/message
 drizzle --remote list-ports                             # what Tools > Port offers, with USB ids and recognised boards
 drizzle --remote upload --sketch ~/Arduino/blink --port COM5
+drizzle --remote serial-open --baud 115200              # Tools > Serial Monitor
+drizzle --remote serial-log --from upload --wait-for-regex "READY" --timeout 20
 drizzle --remote autogen-markers --sketch ~/Arduino/blink --mode all
 drizzle --remote list-fqbns
 drizzle --remote cancel <job-id>                        # stops a running command
@@ -405,6 +408,16 @@ __Tools → Drizzle → Cancel Remote Command__.
 during the upload, as the __Upload__ button does. With `--programmer <id>` (see `list-programmers`) it works like
 __Upload Using Programmer__. It doesn't show the IDE's dialogs: when no port is selected, or a network board asks for
 its password, it fails and tells why instead.
+
+While the IDE's __Serial Monitor__ or __Serial Plotter__ is open, Drizzle records what it receives, in memory, with
+each line's arrival time, along with what happens meanwhile: uploads, pauses, closing, a new baud rate. `serial-log`
+returns the lines in batches, from the start, the last upload, a line number or a time, up to a time or the newest
+line; it can also wait for a line matching `--wait-for-regex`, or simply collect what arrives for `--timeout` seconds.
+It doesn't run as a job, so it works while other commands run. `serial-open` opens the Serial Monitor like
+__Tools → Serial Monitor__ (optionally choosing `--port` and `--baud`), `serial-send --text` sends a line to the board
+like the monitor's input field, and `serial-close` closes the monitor to free the port for other programs. The windows
+stay visible; what remote commands do with them shows in the IDE's console, and __Clear__ also clears the record.
+Monitors of network boards aren't recorded.
 
 [skills/drizzle-arduino/SKILL.md](skills/drizzle-arduino/SKILL.md) is a ready-made skill that teaches an LLM agent
 (e.g. Claude Code) how to use it. To install it for all your projects:

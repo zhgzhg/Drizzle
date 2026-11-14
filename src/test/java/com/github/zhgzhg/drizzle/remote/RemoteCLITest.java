@@ -20,6 +20,7 @@ import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -339,6 +340,78 @@ class RemoteCLITest {
         assertEquals(RemoteCLI.EXIT_USAGE, cli("compile", "--sketch", blink.getPath(), "--port", "COM5"));
         assertEquals(RemoteCLI.EXIT_USAGE, cli("upload", "--sketch", blink.getPath(), "--programmer", " "));
         assertEquals(RemoteCLI.EXIT_USAGE, cli("upload", "--port", "COM5"));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<String> outputLines() {
+        List<String> lines = new ArrayList<>();
+        for (Map<String, Object> line : (List<Map<String, Object>>) lastOutput.get("lines")) {
+            if (line.containsKey("text")) lines.add((String) line.get("text"));
+            if (line.containsKey("event")) lines.add("event: " + line.get("event"));
+            if (line.containsKey("sent")) lines.add("sent: " + line.get("sent"));
+        }
+        return lines;
+    }
+
+    @Test
+    void followsTheSerialMonitor() throws Exception {
+        startInstance(1, blink);
+        FakeCommandHandler ide = handlers.get(0);
+
+        assertEquals(RemoteCLI.EXIT_OK, cli("serial-open", "--port", "COM7", "--baud", "115200"));
+        assertEquals("serial-open", lastOutput.get("command"));
+        assertEquals("COM7", ide.lastArgs.get(RemoteProtocol.ARG_PORT));
+        assertEquals("115200", ide.lastArgs.get(RemoteProtocol.ARG_BAUD));
+
+        ide.serialLog.received("Booting\nREADY\n");
+        assertEquals(RemoteCLI.EXIT_OK, cli("serial-log", "--from", "start"));
+        assertEquals(Arrays.asList("event: opened Serial Monitor on COM7", "Booting", "READY"), outputLines());
+        assertEquals("COM7", outputMap("monitor").get("port"));
+        assertEquals(3.0, lastOutput.get("next"));
+
+        assertEquals(RemoteCLI.EXIT_OK, cli("serial-send", "--text", "help", "--line-ending", "crlf"));
+        assertEquals("help", ide.lastArgs.get(RemoteProtocol.ARG_TEXT));
+        assertEquals("crlf", ide.lastArgs.get(RemoteProtocol.ARG_LINE_ENDING));
+
+        // what the board answers arrives later
+        Thread board = new Thread(() -> {
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                return;
+            }
+            ide.serialLog.received("unknown command\nOK\n");
+        });
+        board.start();
+        assertEquals(RemoteCLI.EXIT_OK, cli("serial-log", "--from", "3", "--wait-for-regex", "^OK$", "--timeout", "10"));
+        board.join();
+        assertEquals("match", lastOutput.get("stopped"));
+        assertEquals(Arrays.asList("sent: help\n", "unknown command", "OK"), outputLines());
+
+        assertEquals(RemoteCLI.EXIT_OK, cli("serial-log", "--timeout", "0"));
+        assertEquals("timeout", lastOutput.get("stopped"));
+
+        assertEquals(RemoteCLI.EXIT_OK, cli("serial-close"));
+        assertEquals(RemoteCLI.EXIT_FAILED, cli("serial-send", "--text", "help"));
+        assertEquals(RemoteProtocol.ERR_MONITOR_CLOSED, outputMap("error").get("code"));
+    }
+
+    @Test
+    void reportsMistakesInSerialMonitorOptionsBeforeAskingTheIde() throws Exception {
+        startInstance(1, blink);
+
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-log", "--from", "yesterday"));
+        assertTrue(String.valueOf(outputMap("error").get("message")).contains("start, upload"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-log", "--wait-for-regex", "("));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-log", "--timeout", "601"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-log", "--to", "+10s"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-log", "--text", "help"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-send"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-send", "--text", "help", "--line-ending", "lf"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-open", "--baud", "fast"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("serial-open", "--programmer", "arduino:usbasp"));
+        assertEquals(RemoteCLI.EXIT_USAGE, cli("compile", "--sketch", blink.getPath(), "--from", "start"));
+        assertEquals(0, handlers.get(0).serialLogCalls.get());
     }
 
     @Test

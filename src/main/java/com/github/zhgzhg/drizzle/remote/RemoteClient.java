@@ -273,6 +273,17 @@ public final class RemoteClient {
     }
 
     /**
+     * @param maxWaitSeconds how long the IDE may wait for lines to arrive before it answers
+     * @return the requested part of what the Serial Monitor received
+     */
+    public Map<String, Object> serialLog(final InstanceInfo info, final Map<String, String> args, final long maxWaitSeconds)
+            throws IOException, RemoteException {
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("args", args);
+        return call(info, "POST", RemoteProtocol.SERIAL_LOG_PATH, body, READ_TIMEOUT_MS + maxWaitSeconds * 1000);
+    }
+
+    /**
      * Polls a job until it finishes or the timeout passes.
      *
      * @param progress receives the job's output as it arrives; may be null
@@ -375,12 +386,17 @@ public final class RemoteClient {
 
     private Map<String, Object> call(final InstanceInfo info, final String method, final String path, final Map<String, Object> body)
             throws IOException, RemoteException {
+        return call(info, method, path, body, READ_TIMEOUT_MS);
+    }
+
+    private Map<String, Object> call(final InstanceInfo info, final String method, final String path, final Map<String, Object> body,
+            final long readTimeoutMs) throws IOException, RemoteException {
 
         HttpURLConnection connection = (HttpURLConnection) new URL(info.baseUrl() + path).openConnection(Proxy.NO_PROXY);
         try {
             connection.setRequestMethod(method);
             connection.setConnectTimeout(CONNECT_TIMEOUT_MS);
-            connection.setReadTimeout(READ_TIMEOUT_MS);
+            connection.setReadTimeout((int) Math.min(readTimeoutMs, Integer.MAX_VALUE));
             connection.setUseCaches(false);
             connection.setRequestProperty(RemoteProtocol.TOKEN_HEADER, info.token);
             connection.setRequestProperty("Accept", "application/json");

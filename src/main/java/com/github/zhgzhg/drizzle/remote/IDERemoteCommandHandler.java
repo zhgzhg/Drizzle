@@ -2,6 +2,8 @@ package com.github.zhgzhg.drizzle.remote;
 
 import com.github.zhgzhg.drizzle.Drizzle;
 import com.github.zhgzhg.drizzle.DrizzleCLI;
+import com.github.zhgzhg.drizzle.utils.arduino.SerialMonitorControl;
+import com.github.zhgzhg.drizzle.utils.arduino.SerialMonitorTap;
 import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
 import com.github.zhgzhg.drizzle.utils.arduino.UploadTargets;
 import processing.app.Base;
@@ -46,13 +48,34 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
 
     private static final List<String> COMMANDS = Arrays.asList(RemoteProtocol.CMD_OPEN, RemoteProtocol.CMD_APPLY_MARKERS,
             RemoteProtocol.CMD_COMPILE, RemoteProtocol.CMD_UPLOAD, RemoteProtocol.CMD_AUTOGEN_MARKERS,
-            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS);
+            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS,
+            RemoteProtocol.CMD_SERIAL_OPEN, RemoteProtocol.CMD_SERIAL_CLOSE, RemoteProtocol.CMD_SERIAL_SEND);
     private static final List<String> NON_EXCLUSIVE_COMMANDS = Arrays.asList(RemoteProtocol.CMD_OPEN,
-            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS);
+            RemoteProtocol.CMD_LIST_FQBNS, RemoteProtocol.CMD_LIST_PORTS, RemoteProtocol.CMD_LIST_PROGRAMMERS,
+            RemoteProtocol.CMD_SERIAL_CLOSE, RemoteProtocol.CMD_SERIAL_SEND);
+    private static final List<String> SERIAL_COMMANDS = Arrays.asList(RemoteProtocol.CMD_SERIAL_OPEN,
+            RemoteProtocol.CMD_SERIAL_CLOSE, RemoteProtocol.CMD_SERIAL_SEND);
 
     private static final long UI_TIMEOUT_SECONDS = 10; // shorter than the client's read timeout
     private static final long OPEN_TIMEOUT_SECONDS = 60;
     private static final long ENDPOINT_WAIT_MS = 15000;
+
+    // one Serial Monitor (and Plotter) serves all the IDE's windows, and so does this handler
+    private final SerialLog serialMonitorLog = new SerialLog();
+    private final SerialMonitorTap serialMonitorTap;
+    private final String serialMonitorProblem;
+
+    public IDERemoteCommandHandler() {
+        SerialMonitorTap tap = null;
+        String problem = null;
+        try {
+            tap = SerialMonitorTap.start(serialMonitorLog);
+        } catch (Exception | LinkageError e) {
+            problem = e.toString();
+        }
+        this.serialMonitorTap = tap;
+        this.serialMonitorProblem = problem;
+    }
 
     @Override
     public Map<String, Object> status() throws RemoteException {
@@ -63,6 +86,7 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
         // the CLI finds instances through their status; a problem with these details mustn't hide the instance
         status.put("port", orNull(UploadTargets::describeSelectedPort));
         status.put("programmer", orNull(UploadTargets::describeSelectedProgrammer));
+        status.put("serialMonitor", serialMonitorTap != null ? serialMonitorTap.describe() : null);
         status.put("sketches", onUiThread(() -> {
             List<Map<String, Object>> sketches = new ArrayList<>();
             for (Editor editor : editors()) {
@@ -135,6 +159,9 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
                 result.put("programmers", UploadTargets.describeProgrammers());
                 return result;
             }
+            if (SERIAL_COMMANDS.contains(command)) {
+                return serialCommand(command, args);
+            }
 
             Editor editor = findEditor(requireSketch(args));
             Map<String, Object> result = forwardToEditor(editor, command, args);
@@ -154,6 +181,47 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
             }
             result.put("board", selectedBoard());
             return result;
+        }
+    }
+
+    @Override
+    public Map<String, Object> serialLog(final Map<String, String> args) throws RemoteException {
+        requireSerialMonitorTap();
+        SerialLogQuery query = SerialLogQuery.fromArgs(args, serialMonitorLog.currentTimeMillis(), serialMonitorLog.zone());
+        try {
+            return serialMonitorLog.read(query);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RemoteException(RemoteProtocol.ERR_INTERNAL, "Interrupted while waiting for the Serial Monitor");
+        }
+    }
+
+    private Map<String, Object> serialCommand(final String command, final Map<String, String> args) throws RemoteException {
+        requireSerialMonitorTap();
+        SerialMonitorControl control = new SerialMonitorControl(serialMonitorTap);
+        try {
+            switch (command) {
+                case RemoteProtocol.CMD_SERIAL_OPEN:
+                    return control.open(args.get(RemoteProtocol.ARG_PORT), args.get(RemoteProtocol.ARG_BAUD));
+                case RemoteProtocol.CMD_SERIAL_CLOSE:
+                    return control.close();
+                default:
+                    return control.send(args.get(RemoteProtocol.ARG_TEXT), args.get(RemoteProtocol.ARG_LINE_ENDING));
+            }
+        } catch (RemoteException e) {
+            throw e;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RemoteException(RemoteProtocol.ERR_CANCELLED, "Cancelled");
+        } catch (Exception e) {
+            throw new RemoteException(RemoteProtocol.ERR_INTERNAL, e.toString(), e);
+        }
+    }
+
+    private void requireSerialMonitorTap() throws RemoteException {
+        if (serialMonitorTap == null) {
+            throw new RemoteException(RemoteProtocol.ERR_FAILED, "Drizzle can't follow the Serial Monitor of this Arduino"
+                    + " IDE: " + serialMonitorProblem);
         }
     }
 
@@ -337,7 +405,7 @@ public final class IDERemoteCommandHandler implements RemoteCommandHandler {
      * Runs a task on Swing's event dispatch thread and waits for it, but not forever: a modal dialog or a long
      * operation can keep the thread busy.
      */
-    static <T> T onUiThread(final Callable<T> task, final long timeoutSeconds) throws RemoteException {
+    public static <T> T onUiThread(final Callable<T> task, final long timeoutSeconds) throws RemoteException {
         try {
             if (SwingUtilities.isEventDispatchThread()) {
                 return task.call();

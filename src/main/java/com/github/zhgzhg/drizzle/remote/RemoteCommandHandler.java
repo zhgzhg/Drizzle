@@ -34,4 +34,12 @@ public interface RemoteCommandHandler {
      * @return the job's result
      */
     Map<String, Object> execute(String command, Map<String, String> args, Consumer<String> log) throws RemoteException;
+
+    /**
+     * Answers a {@code serial-log} call (see {@link SerialLogQuery}) on the HTTP thread, without a job, so it neither
+     * waits for nor holds up other commands. It may wait for lines to arrive, up to the call's timeout.
+     */
+    default Map<String, Object> serialLog(Map<String, String> args) throws RemoteException {
+        throw new RemoteException(RemoteProtocol.ERR_NOT_FOUND, "This IDE doesn't record the Serial Monitor");
+    }
 }

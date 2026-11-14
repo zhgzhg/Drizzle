@@ -13,6 +13,7 @@ public final class RemoteProtocol {
     public static final String STATUS_PATH = "/api/v1/status";
     public static final String JOBS_PATH = "/api/v1/jobs";
     public static final String CANCEL_SUFFIX = "/cancel";
+    public static final String SERIAL_LOG_PATH = "/api/v1/serial-log";
 
     public static final String CMD_OPEN = "open";
     public static final String CMD_APPLY_MARKERS = "apply-markers";
@@ -22,12 +23,25 @@ public final class RemoteProtocol {
     public static final String CMD_UPLOAD = "upload";
     public static final String CMD_LIST_PORTS = "list-ports";
     public static final String CMD_LIST_PROGRAMMERS = "list-programmers";
+    public static final String CMD_SERIAL_OPEN = "serial-open";
+    public static final String CMD_SERIAL_CLOSE = "serial-close";
+    public static final String CMD_SERIAL_SEND = "serial-send";
+    // answered right away instead of running as a job
+    public static final String CMD_SERIAL_LOG = "serial-log";
 
     public static final String ARG_SKETCH = "sketch";
     public static final String ARG_VERBOSE = "verbose";
     public static final String ARG_MODE = "mode";
     public static final String ARG_PORT = "port";
     public static final String ARG_PROGRAMMER = "programmer";
+    public static final String ARG_BAUD = "baud";
+    public static final String ARG_TEXT = "text";
+    public static final String ARG_LINE_ENDING = "lineEnding";
+    public static final String ARG_FROM = "from";
+    public static final String ARG_TO = "to";
+    public static final String ARG_WAIT_FOR_REGEX = "waitForRegex";
+    public static final String ARG_TIMEOUT = "timeout";
+    public static final String ARG_MAX_LINES = "maxLines";
 
     public static final String JOB_RUNNING = "running";
     public static final String JOB_DONE = "done";
@@ -45,6 +59,7 @@ public final class RemoteProtocol {
     public static final String ERR_FAILED = "failed";
     public static final String ERR_PORT_UNAVAILABLE = "port_unavailable";
     public static final String ERR_PASSWORD_REQUIRED = "password_required";
+    public static final String ERR_MONITOR_CLOSED = "monitor_closed";
     public static final String ERR_IDE_UNRESPONSIVE = "ide_unresponsive";
     public static final String ERR_INTERNAL = "internal";
 

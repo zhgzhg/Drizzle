@@ -227,11 +227,25 @@ public final class UploadTargets {
     }
 
     /**
-     * Boards without a bootloader (no upload.protocol) get uploaded through the selected programmer even by Upload.
+     * Boards without a bootloader get uploaded through the selected programmer even by Upload. Like the IDE's serial
+     * uploader, this looks for upload.protocol in the board's settings and in those of its upload tool, where e.g.
+     * the ESP32 boards declare it.
      */
     public static boolean uploadUsesProgrammer() {
         PreferencesMap board = BaseNoGui.getBoardPreferences();
-        return board != null && board.get("upload.protocol") == null;
+        if (board == null) return false;
+        if (board.get("upload.protocol") != null) return false;
+
+        String tool = board.get("upload.tool");
+        if (tool == null) return true;
+        TargetPlatform platform = BaseNoGui.getTargetPlatform();
+        if (tool.contains(":")) {
+            String[] packageAndTool = tool.split(":", 2);
+            platform = BaseNoGui.getCurrentTargetPlatformFromPackage(packageAndTool[0]);
+            tool = packageAndTool[1];
+        }
+        PreferencesMap toolSettings = platform != null ? platform.getTool(tool) : null;
+        return toolSettings == null || toolSettings.get("upload.protocol") == null;
     }
 
     private static TargetBoard matchingBoard(final BoardPort port) {

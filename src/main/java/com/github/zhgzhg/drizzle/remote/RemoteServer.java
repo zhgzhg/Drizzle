@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 /**
  * The HTTP API Drizzle exposes inside Arduino IDE. It listens on the loopback interface only and answers requests
@@ -33,10 +34,15 @@ import java.util.concurrent.Executors;
  *     <li>{@code POST /api/v1/jobs} with {@code {"command": "...", "args": {...}}} - starts a command</li>
  *     <li>{@code GET /api/v1/jobs/<id>?logFrom=<offset>} - a command's state, result and output</li>
  *     <li>{@code POST /api/v1/jobs/<id>/cancel} - cancels a running command</li>
+ *     <li>{@code POST /api/v1/serial-log} with {@code {"args": {...}}} - what the Serial Monitor received; answered
+ *     without a job, possibly after waiting for more</li>
  * </ul>
  */
 public final class RemoteServer {
     private static final int MAX_REQUEST_BYTES = 64 * 1024;
+    private static final int HTTP_THREADS = 4;
+    // serial-log calls may wait for minutes; the other threads stay free for status checks and jobs
+    private static final int MAX_SERIAL_LOG_CALLS = 2;
 
     private final Gson gson = new GsonBuilder().disableHtmlEscaping().create();
     private final RemoteCommandHandler handler;
@@ -45,6 +51,7 @@ public final class RemoteServer {
     private final String token;
     private final HttpServer server;
     private final ExecutorService executor;
+    private final Semaphore serialLogCalls = new Semaphore(MAX_SERIAL_LOG_CALLS);
 
     private RemoteServer(final RemoteCommandHandler handler, final String instanceId) throws IOException {
         this.handler = handler;
@@ -53,7 +60,7 @@ public final class RemoteServer {
         this.token = newToken();
 
         this.server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
-        this.executor = Executors.newFixedThreadPool(4, r -> {
+        this.executor = Executors.newFixedThreadPool(HTTP_THREADS, r -> {
             Thread t = new Thread(r, "drizzle-remote-http");
             t.setDaemon(true);
             return t;
@@ -125,6 +132,12 @@ public final class RemoteServer {
                     return;
                 }
                 getJob(exchange, path.substring(RemoteProtocol.JOBS_PATH.length() + 1));
+            } else if (RemoteProtocol.SERIAL_LOG_PATH.equals(path)) {
+                if (!"POST".equals(method)) {
+                    sendError(exchange, 405, RemoteProtocol.ERR_BAD_REQUEST, "Use POST");
+                    return;
+                }
+                readSerialLog(exchange);
             } else {
                 sendError(exchange, 404, RemoteProtocol.ERR_NOT_FOUND, "No such endpoint: " + path);
             }
@@ -180,6 +193,38 @@ public final class RemoteServer {
     }
 
     private void submitJob(final HttpExchange exchange) throws IOException, RemoteException {
+        Map<String, Object> body = readJsonBody(exchange);
+        if (!(body.get("command") instanceof String)) {
+            throw new RemoteException(RemoteProtocol.ERR_BAD_REQUEST, "Missing \"command\"");
+        }
+
+        Job job = jobs.submit((String) body.get("command"), argsOf(body));
+
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("ok", true);
+        json.put("instance", instanceId);
+        json.put("job", job.toJson(0));
+        send(exchange, 202, json);
+    }
+
+    private void readSerialLog(final HttpExchange exchange) throws IOException, RemoteException {
+        Map<String, String> args = argsOf(readJsonBody(exchange));
+        if (!serialLogCalls.tryAcquire()) {
+            throw new RemoteException(RemoteProtocol.ERR_BUSY, MAX_SERIAL_LOG_CALLS + " serial-log calls are waiting"
+                    + " already; let them finish first");
+        }
+        try {
+            Map<String, Object> json = new LinkedHashMap<>();
+            json.put("ok", true);
+            json.put("instance", instanceId);
+            json.putAll(handler.serialLog(args));
+            send(exchange, 200, json);
+        } finally {
+            serialLogCalls.release();
+        }
+    }
+
+    private Map<String, Object> readJsonBody(final HttpExchange exchange) throws IOException, RemoteException {
         String contentType = exchange.getRequestHeaders().getFirst("Content-Type");
         if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("application/json")) {
             throw new RemoteException(RemoteProtocol.ERR_BAD_REQUEST, "Expected Content-Type: application/json");
@@ -191,10 +236,13 @@ public final class RemoteServer {
         } catch (JsonParseException e) {
             throw new RemoteException(RemoteProtocol.ERR_BAD_REQUEST, "Malformed JSON: " + e.getMessage());
         }
-        if (body == null || !(body.get("command") instanceof String)) {
-            throw new RemoteException(RemoteProtocol.ERR_BAD_REQUEST, "Missing \"command\"");
+        if (body == null) {
+            throw new RemoteException(RemoteProtocol.ERR_BAD_REQUEST, "Expected a JSON object");
         }
+        return body;
+    }
 
+    private static Map<String, String> argsOf(final Map<String, Object> body) throws RemoteException {
         Map<String, String> args = new LinkedHashMap<>();
         Object rawArgs = body.get("args");
         if (rawArgs instanceof Map) {
@@ -204,14 +252,7 @@ public final class RemoteServer {
         } else if (rawArgs != null) {
             throw new RemoteException(RemoteProtocol.ERR_BAD_REQUEST, "\"args\" must be an object");
         }
-
-        Job job = jobs.submit((String) body.get("command"), args);
-
-        Map<String, Object> json = new LinkedHashMap<>();
-        json.put("ok", true);
-        json.put("instance", instanceId);
-        json.put("job", job.toJson(0));
-        send(exchange, 202, json);
+        return args;
     }
 
     private void getJob(final HttpExchange exchange, final String id) throws IOException, RemoteException {

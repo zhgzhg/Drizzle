@@ -12,8 +12,11 @@ import java.net.InetAddress;
 import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -167,6 +170,48 @@ class RemoteServerTest {
             }
             assertTrue(lease.isHeld());
         }
+    }
+
+    @Test
+    void readsTheSerialMonitorWhileAJobRuns() throws Exception {
+        client.submit(info, RemoteProtocol.CMD_UPLOAD, sketchArgs("/sketches/slow"));
+        assertTrue(handler.started.await(10, TimeUnit.SECONDS));
+        handler.serialLog.received("tick\n");
+
+        Map<String, Object> read = client.serialLog(info, Collections.singletonMap(RemoteProtocol.ARG_FROM, "start"), 0);
+        assertEquals(true, read.get("ok"));
+        assertEquals("server-test", read.get("instance"));
+        assertEquals("tick", ((Map<?, ?>) ((List<?>) read.get("lines")).get(0)).get("text"));
+    }
+
+    @Test
+    void keepsThreadsFreeForOtherRequestsWhileSerialLogCallsWait() throws Exception {
+        Map<String, String> waitForDone = new LinkedHashMap<>();
+        waitForDone.put(RemoteProtocol.ARG_WAIT_FOR_REGEX, "DONE");
+        waitForDone.put(RemoteProtocol.ARG_TIMEOUT, "20");
+
+        List<Thread> waiting = new ArrayList<>();
+        List<Object> answers = Collections.synchronizedList(new ArrayList<>());
+        for (int i = 0; i < 2; ++i) {
+            Thread thread = new Thread(() -> {
+                try {
+                    answers.add(client.serialLog(info, waitForDone, 20).get("stopped"));
+                } catch (Exception e) {
+                    answers.add(e);
+                }
+            });
+            thread.start();
+            waiting.add(thread);
+        }
+        for (int i = 0; i < 200 && handler.serialLogCalls.get() < 2; ++i) Thread.sleep(25);
+        assertEquals(2, handler.serialLogCalls.get());
+
+        assertRemoteError(RemoteProtocol.ERR_BUSY, () -> client.serialLog(info, waitForDone, 20));
+        assertEquals(false, client.status(info).get("busy"), "status still answers");
+
+        handler.serialLog.received("DONE\n");
+        for (Thread thread : waiting) thread.join(10000);
+        assertEquals(Arrays.asList("match", "match"), answers);
     }
 
     @Test

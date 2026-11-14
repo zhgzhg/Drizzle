@@ -1,9 +1,10 @@
 ---
 name: drizzle-arduino
-description: Build Arduino sketches, upload them to boards, and install their dependencies through a running
-  Arduino IDE 1.8.19 with the Drizzle plugin. Use when asked to compile/verify or upload an Arduino sketch, or to
-  fetch the boards, libraries and board settings that its Drizzle markers (@BoardManager, @Board, @BoardSettings,
-  @DependsOn, @Preferences) or its drizzle.json declare.
+description: Build Arduino sketches, upload them to boards, read what the boards print in the Serial Monitor, and
+  install their dependencies through a running Arduino IDE 1.8.19 with the Drizzle plugin. Use when asked to
+  compile/verify or upload an Arduino sketch, to check a board's serial output, or to fetch the boards, libraries and
+  board settings that its Drizzle markers (@BoardManager, @Board, @BoardSettings, @DependsOn, @Preferences) or its
+  drizzle.json declare.
 ---
 
 # Drizzle remote control
@@ -17,6 +18,10 @@ launcher, which finds the right IDE instance and handles the connection details:
 The launcher is (re)written every time the IDE starts with Drizzle. If it's missing, or
 `drizzle --remote list` reports no instances (exit code 3), ask the user to start Arduino IDE 1.8.19 with
 Drizzle 0.17.0 or newer installed.
+
+`upload`, `list-ports`, `list-programmers` and the Serial Monitor commands need Drizzle 0.18.0 or newer;
+`drizzle --remote list` shows each IDE's version as `drizzle`. Older versions reject them with `Unknown remote command`
+or `Unknown argument` (exit code 2): ask the user to update Drizzle instead of changing the call.
 
 ## Markers and drizzle.json
 
@@ -49,8 +54,8 @@ Other commands:
   Nothing is written: copy what you need into the sketch's markers or `drizzle.json` yourself.
 - `drizzle --remote list-fqbns [--sketch <path>]` lists the boards the IDE knows, as `package:platform:board`.
   Markers separate these parts with `::` instead of `:`; see the reference.
-- `drizzle --remote status --sketch <path>` shows the IDE's state: selected board, port and programmer, open
-  sketches, unsaved changes, the running job.
+- `drizzle --remote status --sketch <path>` shows the IDE's state: selected board, port and programmer, the Serial
+  Monitor, open sketches, unsaved changes, the running job.
 - `drizzle --parse <sketch folder>` prints what the sketch declares (its `drizzle.json`, or else its markers) as JSON,
   without needing the IDE.
 
@@ -66,6 +71,7 @@ Every command prints one JSON object on stdout; `ok` tells whether it succeeded 
 | 1 | `error.code` is `cancelled`: the user (or you) stopped the command | Don't retry without asking the user |
 | 1 | `error.code` is `port_unavailable`: no port is selected, or it isn't connected | See [Uploading](#uploading) |
 | 1 | `error.code` is `password_required`: a network board needs its password | See [Uploading](#uploading) |
+| 1 | `error.code` is `monitor_closed`: sending needs an open Serial Monitor | See [Serial Monitor](#serial-monitor) |
 | 2 | Bad arguments, or the sketch is open in more than one IDE | Fix the call; pass `--instance <id>` from `list` |
 | 3 | No running IDE with Drizzle | Ask the user to start Arduino IDE |
 | 4 | Sketch not open in any IDE | Run `open` first |
@@ -109,7 +115,55 @@ selected programmer.
 Network (OTA) ports with `passwordRequired: true` fail with `password_required`: the IDE asks for the password in a
 dialog. Ask the user to upload once from the IDE; it then remembers the password until it exits.
 
-If the IDE reports `upload` as an unknown command, its Drizzle is too old: ask the user to update Drizzle.
+## Serial Monitor
+
+While the IDE's Serial Monitor is open (or its Serial Plotter, if the user opened that instead), Drizzle records what
+it receives, with each line's arrival time. The window stays visible to the user.
+
+- `drizzle --remote serial-open [--port <address>] [--baud <rate>]` opens the Serial Monitor like Tools → Serial
+  Monitor. Pass the rate of the sketch's `Serial.begin(...)`; `--port` and `--baud` stay selected in the IDE, as if
+  the user chose them. Opening the monitor, or changing its rate, restarts boards like the Uno, Nano or Mega; ESP32
+  boards and boards with native USB (Leonardo, RP2040...) keep running.
+- `drizzle --remote serial-log` returns the lines as `{"t": "14:03:12.345", "text": "..."}`, along with what happened
+  (`event`: opened, paused for the upload, closed in the IDE...) and what was sent (`sent`):
+  - `--from`: `start` (the oldest line kept), `upload` (the last upload on: the new program's output), `now`, a line
+    number (the `next` of an earlier call), a time from earlier lines (`14:03:12.345`), or a time before now (`-30s`).
+    Without it: the newest lines.
+  - `--to`: a time, `-5s`, or a duration after `--from` (`+10s`). Without it: up to the newest line.
+  - `--max-lines <n>` (default 200): when `more` is true, continue with `--from <next>`.
+  - `--wait-for-regex <regex>` waits until a line matches; `match` holds that line.
+  - `--timeout <seconds>` (default 30, at most 600) limits any waiting; on its own, the call collects what arrives
+    for that long, which is also the way to wait for a while. Keep it below your own command timeout.
+  - A `--to` in the future makes the call wait until then. `stopped` tells why a wait ended: `match`, `to`, `timeout`
+    or `closed` (the monitor got closed).
+- `drizzle --remote serial-send --text <text> [--line-ending none|nl|cr|crlf]` sends text to the board like the
+  monitor's input field, by default with the line ending chosen there. It acts on the board: send only what the user
+  asked for, or agreed to let you send.
+- `drizzle --remote serial-close` closes the monitor (or plotter) and frees the port.
+
+After changing a sketch:
+
+1. Open the monitor before uploading.
+2. `drizzle --remote upload --sketch <path>` pauses the monitor and reopens it afterwards.
+3. `drizzle --remote serial-log --from upload --wait-for-regex "READY|ERROR" --timeout 20`
+
+The board starts the new program as soon as the upload ends, about a second before the monitor reopens. Boards that
+restart when the monitor opens (Uno, Nano, Mega) start over then, so nothing is lost. On the others, what the program
+prints in its first second is lost: wait for something it prints later or repeatedly, or, if you need the startup
+lines, ask the user to press the board's reset button once the monitor is open again.
+
+Notes:
+
+- Garbled text usually means a wrong baud rate: check `Serial.begin(...)` and pass it to `serial-open --baud`.
+- A line without a line break (e.g. a prompt) shows up once nothing gets added to it for a quarter of a second.
+- Times are when the IDE received the text (about 30 ms resolution); if timing matters, have the sketch print
+  `millis()`.
+- The user may close the monitor or click Clear, which also clears the record (an `event` says so). If the user
+  closed the monitor, ask before reopening it.
+- Before another program (a script, arduino-cli...) uses the port, close the monitor. Uploads through Drizzle or the
+  IDE don't need that.
+- `serial-open` fails while the Serial Plotter is open on another port or rate: ask the user to close it.
+- `serial-log` doesn't run as a job: it works while another command runs. Monitors of network boards aren't recorded.
 
 ## Left to the user
 
