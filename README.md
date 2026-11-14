@@ -434,6 +434,10 @@ npx skills add https://github.com/zhgzhg/Drizzle.git -g --skill drizzle-arduino
 Without `-g` it's installed into the current project only. Alternatively, copy the `skills/drizzle-arduino` folder
 into your agent's skills folder, e.g. `~/.claude/skills/` for Claude Code.
 
+The skill itself is only a pointer: it has the agent run `drizzle --guide`, which prints the instructions of the
+installed Drizzle, and `drizzle --guide markers`, the reference for the markers and __drizzle.json__. Since these come
+with Drizzle, the skill stays current when Drizzle gets updated; it needs installing only once.
+
 How it works and how it's protected:
 
 * The HTTP API listens on the loopback interface only, on a random port.

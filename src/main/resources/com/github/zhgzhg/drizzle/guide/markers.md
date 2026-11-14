@@ -80,8 +80,8 @@ properties at compile time, e.g. `@Preferences *::esp32::*::compiler.cpp.extra_f
 any provider, platform or board. When several matching markers define the same property, the first one wins and the
 later ones still add their other properties, so again: specific markers first, general ones last.
 
-**`@ArduinoTool name::version condition::zip URL`** installs an IDE plugin. Remote commands don't handle it; see
-SKILL.md.
+**`@ArduinoTool name::version condition::zip URL`** installs an IDE plugin. Remote commands don't handle it: the
+user installs it from the IDE (see "Left to the user" in `drizzle --guide`).
 
 ## drizzle.json
 

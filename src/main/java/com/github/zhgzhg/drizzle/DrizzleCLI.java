@@ -33,8 +33,13 @@ public class DrizzleCLI {
 
             System.out.printf("%n\tControls a running Arduino IDE %s with Drizzle (prints JSON):%n%n", "1.8.19");
             System.out.print(RemoteCLI.usage("drizzle"));
+            System.out.printf("%n\tInstructions for LLM agents, matching this version of Drizzle:%n%n");
+            System.out.printf("\tdrizzle --guide [%s]%n", String.join("|", Guide.TOPICS));
             System.out.printf("%n\t\"drizzle\" is the launcher Arduino IDE writes into %s%n", Launcher.defaultDirectory());
             return;
+        }
+        if (args.length > 0 && "--guide".equals(args[0])) {
+            System.exit(Guide.print(Arrays.copyOfRange(args, 1, args.length), System.out, System.err));
         }
         if (args.length > 0 && "--remote".equals(args[0])) {
             System.exit(RemoteCLI.run(Arrays.copyOfRange(args, 1, args.length)));
