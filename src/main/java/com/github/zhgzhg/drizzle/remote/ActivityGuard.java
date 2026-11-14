@@ -71,6 +71,21 @@ public final class ActivityGuard {
     }
 
     /**
+     * Starts an activity triggered from the IDE that mustn't interrupt any other, e.g. a restart of the IDE. Activities
+     * started later from the IDE aren't kept from running; remote commands are.
+     *
+     * @return the lease, or null while another activity or a remote command runs
+     */
+    public static Lease tryLocalAlone(final String description) {
+        synchronized (MONITOR) {
+            if (System.getProperty(REMOTE_PROPERTY) != null || !localEntries().isEmpty()) {
+                return null;
+            }
+            return tryLocal(description);
+        }
+    }
+
+    /**
      * Ends the running remote command's hold, so the IDE becomes usable again, and interrupts its thread. A command
      * stuck in a blocking operation (e.g. a download) may keep running in the background until it ends on its own.
      *

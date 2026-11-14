@@ -19,6 +19,7 @@ import com.github.zhgzhg.drizzle.utils.arduino.ArduinoIDEToolsInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.CompilationInvoker;
 import com.github.zhgzhg.drizzle.utils.arduino.ExternLibFileInstaller;
 import com.github.zhgzhg.drizzle.utils.arduino.IDECompilationHook;
+import com.github.zhgzhg.drizzle.utils.arduino.IDERestarter;
 import com.github.zhgzhg.drizzle.utils.arduino.RemoteUploader;
 import com.github.zhgzhg.drizzle.utils.arduino.UILocator;
 import com.github.zhgzhg.drizzle.utils.arduino.UpdateUtils;
@@ -55,6 +56,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
 import java.util.List;
@@ -73,6 +75,7 @@ public class Drizzle implements Tool {
     public static final String MENU_AUTOGEN_BOARD_MARKERS_TITLE = "Auto-generate @Board* Markers";
     public static final String MENU_SHOW_AVAILABLE_FBNS_TITLE = "List Available FQBNs";
     public static final String MENU_ARDUINO_TOOL_INSTALL_TITLE = "Install tools marked with @ArduinoTool";
+    public static final String MENU_RESTART_IDE_TITLE = "Restart Arduino IDE";
     public static final String MENU_ABOUT_DRIZZLE_TITLE = "About Drizzle";
 
     /** Remote control is offered only in Arduino IDE 1.8.19, the final 1.x release, whose internals it relies on. */
@@ -102,6 +105,7 @@ public class Drizzle implements Tool {
     private JMenuItem availableBoardFqdnListMenu = new JMenuItem(MENU_SHOW_AVAILABLE_FBNS_TITLE);
     private JMenuItem arduinoToolInstallMenu = new JMenuItem(MENU_ARDUINO_TOOL_INSTALL_TITLE);
     private JMenuItem cancelRemoteCommandMenu = new JMenuItem(MENU_CANCEL_REMOTE_COMMAND_TITLE);
+    private JMenuItem restartIdeMenu = new JMenuItem(MENU_RESTART_IDE_TITLE);
     private JMenuItem aboutDrizzleMenu = new JMenuItem(MENU_ABOUT_DRIZZLE_TITLE);
 
     @Override
@@ -262,6 +266,8 @@ public class Drizzle implements Tool {
             }
         });
 
+        this.restartIdeMenu.addActionListener(e -> new Thread(() -> restartIDE(null), "drizzle-restart").start());
+
         this.aboutDrizzleMenu.addActionListener(e -> {
             JOptionPane.showMessageDialog(null, String.format("Drizzle %s - a dependency helper tool for Arduino IDE%n%n%s%n",
                     DrizzleCLI.version(), UpdateUtils.webUrl()), MENU_ABOUT_DRIZZLE_TITLE, JOptionPane.PLAIN_MESSAGE, null);
@@ -292,6 +298,7 @@ public class Drizzle implements Tool {
                             if (isRemoteControlSupported()) {
                                 drizzleMenus.add(cancelRemoteCommandMenu);
                             }
+                            drizzleMenus.add(restartIdeMenu);
                             drizzleMenus.add(aboutDrizzleMenu);
 
                             m.add(drizzleMenus, index);
@@ -319,20 +326,10 @@ public class Drizzle implements Tool {
                         SwingUtilities.invokeLater(() -> {
                             final NotificationPopup[] notificationHolder = new NotificationPopup[1];
                             notificationHolder[0] = UpdateUtils.createNewVersionPopupNotification(editor, logProxy,
-                                    "Install the update & close the IDE", () -> {
-
+                                    "Install the update & restart the IDE", () -> {
                                     notificationHolder[0].close();
-                                    ArduinoIDEToolsInstaller drizzleInstaller = new ArduinoIDEToolsInstaller(logProxy);
-                                    logProxy.cliInfo("Downloading & installing the latest version of Drizzle (please wait)... ");
-
-                                    boolean isSuccess = drizzleInstaller.installTool(MENUS_HOLDER_TITLE, UpdateUtils.latestVersionOfDistZIP());
-                                    if (isSuccess) {
-                                        drizzleInstaller.selfDestroyJarOnExit();
-                                        logProxy.cliWarn("succeeded!%nThe Arduino IDE will be closed in 10 seconds...%n");
-                                        drizzleInstaller.killJVM(10);
-                                    } else {
-                                        logProxy.cliError("failed! Please try again later.%n");
-                                    }
+                                    // the download takes a while; off the UI thread, so the IDE doesn't freeze meanwhile
+                                    new Thread(Drizzle.this::installUpdateAndRestart, "drizzle-update").start();
                                 }
                             );
                             notificationHolder[0].begin();
@@ -1279,11 +1276,49 @@ public class Drizzle implements Tool {
         }
 
         if (installedToolsCount > 0) {
-            logProxy.uiInfo("You'll have to restart Arduino IDE in for the new tools to get loaded.");
-            logProxy.cliInfoln("Please restart the IDE in order to load the newly installed tools.");
+            String restart = String.format("Restart Arduino IDE (Tools > %s > %s) to load the new tools.",
+                    MENUS_HOLDER_TITLE, MENU_RESTART_IDE_TITLE);
+            logProxy.uiInfo(restart);
+            logProxy.cliInfoln(restart);
         }
 
         logProxy.cliInfoln("Finished installing Arduino IDE tools.");
+    }
+
+    /**
+     * Installs the latest Drizzle next to the running one, then restarts the IDE to load it. Call it off the UI thread.
+     */
+    private void installUpdateAndRestart() {
+        ArduinoIDEToolsInstaller drizzleInstaller = new ArduinoIDEToolsInstaller(logProxy);
+        logProxy.cliInfo("Downloading & installing the latest version of Drizzle (please wait)... ");
+        if (!drizzleInstaller.installTool(MENUS_HOLDER_TITLE, UpdateUtils.latestVersionOfDistZIP())) {
+            logProxy.cliError("failed! Please try again later.%n");
+            return;
+        }
+
+        Path replacedJar = drizzleInstaller.replacedRunningJar();
+        if (replacedJar != null) IDERestarter.deleteAfterExit(replacedJar);
+        logProxy.cliInfo("succeeded!%n");
+
+        restartIDE(String.format("The update takes effect the next time Arduino IDE starts; Tools > %s > %s restarts it.",
+                MENUS_HOLDER_TITLE, MENU_RESTART_IDE_TITLE));
+    }
+
+    /**
+     * Quits the IDE like File > Quit, which asks about unsaved changes, and starts it again the way it was started.
+     * Call it off the UI thread.
+     *
+     * @param ifNotRestarted what to tell the user when the IDE keeps running; may be null
+     */
+    private void restartIDE(final String ifNotRestarted) {
+        logProxy.uiInfo("Restarting Arduino IDE...");
+        logProxy.cliInfoln("Restarting Arduino IDE...");
+
+        String problem = IDERestarter.restart();
+        // reached only when the IDE keeps running
+        String message = "Arduino IDE didn't restart. " + problem + (ifNotRestarted != null ? " " + ifNotRestarted : "");
+        logProxy.cliWarnln(message);
+        logProxy.uiWarn(message);
     }
 
     /**

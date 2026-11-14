@@ -67,6 +67,23 @@ class ActivityGuardTest {
     }
 
     @Test
+    void someActivitiesStartOnlyWhenNothingElseRuns() {
+        try (ActivityGuard.Lease upload = ActivityGuard.tryLocal("Upload")) {
+            assertNull(ActivityGuard.tryLocalAlone("Restart Arduino IDE"));
+        }
+        try (ActivityGuard.Lease remote = ActivityGuard.tryRemote("remote compile")) {
+            assertNull(ActivityGuard.tryLocalAlone("Restart Arduino IDE"));
+        }
+
+        try (ActivityGuard.Lease restart = ActivityGuard.tryLocalAlone("Restart Arduino IDE")) {
+            assertNotNull(restart);
+            assertNull(ActivityGuard.tryRemote("remote upload"), "keeps remote commands from starting meanwhile");
+            assertEquals("Restart Arduino IDE", ActivityGuard.busyDescription());
+        }
+        assertNull(ActivityGuard.busyDescription());
+    }
+
+    @Test
     void cancellingFreesTheIdeAndInterruptsTheCommand() throws Exception {
         CountDownLatch holding = new CountDownLatch(1);
         AtomicReference<ActivityGuard.Lease> lease = new AtomicReference<>();

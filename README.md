@@ -105,9 +105,14 @@ How to Install
 How to Update
 -------------
 
-When Arduino IDE is opened, Drizzle will automatically check for newer version, and will offer a semi-automatic update
-process - once downloaded, the IDE will be closed. The next time you open it, the latest version of Drizzle will be
-fully installed.
+When Arduino IDE is opened, Drizzle checks for a newer version and offers to install it. Once it's downloaded, the IDE
+restarts: it quits like __File → Quit__ does, asking about unsaved changes first, and starts again the way it was
+started (e.g. through `arduino_debug.exe`), with the same sketches open. If you cancel quitting, the new version gets
+loaded the next time the IDE starts.
+
+__Tools → Drizzle → Restart Arduino IDE__ restarts the IDE the same way at any time, e.g. after installing tools
+marked with `@ArduinoTool`. While an upload, another Drizzle action or a remote command runs, it refuses and says
+why.
 
 For a manual update follow the steps in [How to Install](#how-to-Install) .
 

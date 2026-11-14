@@ -168,7 +168,7 @@ Notes:
 ## Left to the user
 
 - `@ArduinoTool` markers (IDE plugins): ask the user to use Tools → Drizzle → Install tools marked with
-  @ArduinoTool, and to restart the IDE afterwards.
+  @ArduinoTool, and to restart the IDE afterwards (Drizzle 0.18.0 and newer: Tools → Drizzle → Restart Arduino IDE).
 - Burning a bootloader (Tools → Burn Bootloader).
 
 ## Rules

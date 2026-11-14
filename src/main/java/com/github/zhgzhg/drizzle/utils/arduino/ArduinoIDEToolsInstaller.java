@@ -5,15 +5,17 @@ import com.github.zhgzhg.drizzle.utils.log.LogProxy;
 import com.github.zhgzhg.drizzle.utils.text.TextUtils;
 import net.lingala.zip4j.ZipFile;
 import net.lingala.zip4j.exception.ZipException;
+import net.lingala.zip4j.model.FileHeader;
 import processing.app.EditorConsole;
 
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
-import java.net.URLClassLoader;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.jar.JarFile;
 
@@ -21,6 +23,7 @@ public class ArduinoIDEToolsInstaller {
     private final Path drizzleJarLocation;
     private final Path ideToolsDir;
     private final LogProxy<EditorConsole> logProxy;
+    private final List<Path> installedFiles = new ArrayList<>();
 
     public ArduinoIDEToolsInstaller(LogProxy<EditorConsole> logProxy) {
         this.logProxy = logProxy;
@@ -28,20 +31,28 @@ public class ArduinoIDEToolsInstaller {
         this.ideToolsDir = this.drizzleJarLocation.getParent().getParent().getParent().toAbsolutePath();
     }
 
-    public void selfDestroyJarOnExit() {
-        File drizzleJar = drizzleJarLocation.toFile();
-        if (!drizzleJar.delete()) {
-            drizzleJar.deleteOnExit();
+    /**
+     * After updating Drizzle with {@link #installTool}: the jar Drizzle runs from, unless the update replaced it.
+     * Removing the old tool folder leaves it behind on Windows, where it stays locked while any editor window has it
+     * loaded; and next to the new jar, the IDE would load both.
+     *
+     * @return the jar to delete once the IDE has exited, or null
+     */
+    public Path replacedRunningJar() {
+        if (!Files.exists(this.drizzleJarLocation)) return null;
+        for (Path installed : this.installedFiles) {
+            if (isSameFile(installed, this.drizzleJarLocation)) return null;
+        }
+        return this.drizzleJarLocation;
+    }
 
-            try {
-                URLClassLoader loader = (URLClassLoader) this.getClass().getClassLoader();
-                loader.close();
-                if (!drizzleJar.delete()) {
-                    drizzleJar.deleteOnExit();
-                }
-            } catch (Exception ex) {
-                ex.printStackTrace(System.err);
-            }
+    private static boolean isSameFile(final Path a, final Path b) {
+        try {
+            return Files.isSameFile(a, b);
+        } catch (IOException e) {
+            String x = a.toAbsolutePath().normalize().toString();
+            String y = b.toAbsolutePath().normalize().toString();
+            return File.separatorChar == '\\' ? x.equalsIgnoreCase(y) : x.equals(y);
         }
     }
 
@@ -110,6 +121,7 @@ public class ArduinoIDEToolsInstaller {
         }
 
         boolean isSuccess = false;
+        this.installedFiles.clear();
 
         ZipFile zipFile = new ZipFile(tempFile);
         if (zipFile.isValidZipFile()) {
@@ -119,6 +131,9 @@ public class ArduinoIDEToolsInstaller {
             }
             try {
                 zipFile.extractAll(this.ideToolsDir.toString());
+                for (FileHeader header : zipFile.getFileHeaders()) {
+                    if (!header.isDirectory()) this.installedFiles.add(this.ideToolsDir.resolve(header.getFileName()).normalize());
+                }
                 isSuccess = true;
             } catch (ZipException e) {
                 this.logProxy.cliErrorln(e);
@@ -130,25 +145,5 @@ public class ArduinoIDEToolsInstaller {
         fileUtils.delayedFileRemoval(1000, tempFile);
 
         return isSuccess;
-    }
-
-    public void killJVM(long afterSeconds) {
-        new Thread(() -> {
-            try {
-                for (long j = afterSeconds; j > 0; --j) {
-                    try {
-                        logProxy.uiWarn(".............%d............. seconds until Arduino IDE shuts down", j);
-                    } catch (Exception e) {
-                        // don't care
-                    }
-                    System.err.printf(".............%d.............%n", j);
-                    Thread.sleep( 1000);
-                }
-                System.err.println("..........JVM STOP...........%n");
-            } catch (InterruptedException ex) {
-                // don't care
-            }
-            System.exit(1);
-        }).start();
     }
 }
