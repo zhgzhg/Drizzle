@@ -55,7 +55,7 @@ An example:
  *
  * @Preferences esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)::compiler.cpp.extra_flags=-std=gnu++14 -DTEST123
  *
- * @ArduinoTool Drizzle::(<0.17.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.17.0/drizzle-0.17.0-dist.zip
+ * @ArduinoTool Drizzle::(<0.18.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.18.0/drizzle-0.18.0-dist.zip
  */
 
 // Your sample code follows below just as usual
@@ -210,7 +210,7 @@ Always define the concrete rules in the beginning, and the less concrete at the 
   * The _tool_name_ must match the name of the directory containing the actual tool. It has to be unique. In the case of several duplicating
     names the first one will be respected.
   * Examples:
-    * `@ArduinoTool Drizzle::(<0.17.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.17.0/drizzle-0.17.0-dist.zip`
+    * `@ArduinoTool Drizzle::(<0.18.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.18.0/drizzle-0.18.0-dist.zip`
     * `@ArduinoTool Drizzle::*::file:///C:/Users/John/Drizzle/drizzle.zip`
     * `@ArduinoTool EspExceptionDecoder::(<=1.0.0)::https://github.com/me-no-dev/EspExceptionDecoder/releases/download/2.0.3/EspExceptionDecoder-2.0.3.zip`
 
@@ -230,7 +230,7 @@ from JSON file Drizzle markers will be produced is also supported.
 * __Sketch file__ (`--parse ./my-project/my-project.ino`): it always parses that file's markers, even when a
   __drizzle.json__ sits next to it.
 
-For e.g. `java -jar drizzle-0.17.0-with-deps.jar --parse hello-world.ino` will produce:
+For e.g. `java -jar drizzle-0.18.0-with-deps.jar --parse hello-world.ino` will produce:
 
 ```
 {
@@ -290,14 +290,14 @@ For e.g. `java -jar drizzle-0.17.0-with-deps.jar --parse hello-world.ino` will p
   ],
   "arduino_ide_tools": {
     "Drizzle": {
-      "version": "(<0.17.0)",
-      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.17.0/drizzle-0.17.0-dist.zip"
+      "version": "(<0.18.0)",
+      "url": "https://github.com/zhgzhg/Drizzle/releases/download/0.18.0/drizzle-0.18.0-dist.zip"
     }
   }
 }
 ```
 
-Executing on the above JSON `java -jar drizzle-0.17.0-with-deps.jar --rev-parse hello-world.json` will produce:
+Executing on the above JSON `java -jar drizzle-0.18.0-with-deps.jar --rev-parse hello-world.json` will produce:
 
 ```
 @BoardManager esp8266::^2.6.3::https://arduino.esp8266.com/stable/package_esp8266com_index.json
@@ -307,7 +307,7 @@ Executing on the above JSON `java -jar drizzle-0.17.0-with-deps.jar --rev-parse 
 @DependsOn Arduino_CRC32::1.0.0
 @DependsOn Arduino Cloud Provider Examples::*
 @Preferences esp8266::esp8266::NodeMCU 1.0 (ESP-12E Module)::compiler.cpp.extra_flags=-std=gnu++14 -DTEST123
-@ArduinoTool Drizzle::(<0.17.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.17.0/drizzle-0.17.0-dist.zip
+@ArduinoTool Drizzle::(<0.18.0)::https://github.com/zhgzhg/Drizzle/releases/download/0.18.0/drizzle-0.18.0-dist.zip
 ```
 
 
@@ -324,7 +324,7 @@ Assuming the execution happens inside
 #### Install Drizzle:
 
 ```
-DRIZZLE_VER="0.17.0"
+DRIZZLE_VER="0.18.0"
 
 set -x
 if [[ ! -f "Drizzle/tool/drizzle-$DRIZZLE_VER-with-deps.jar" ]]; then
